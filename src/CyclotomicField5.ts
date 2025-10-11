@@ -33,9 +33,9 @@ function make_(
   );
 }
 
-export const zero = make(Rational.zero, Rational.zero, Rational.zero, Rational.zero);;
+export const zero = make(Rational.zero, Rational.zero, Rational.zero, Rational.zero);
 
-export const one = make(Rational.one, Rational.zero, Rational.zero, Rational.zero);;
+export const one = make(Rational.one, Rational.zero, Rational.zero, Rational.zero);
 
 export const zeta = make(Rational.zero, Rational.one, Rational.zero, Rational.zero);
 
@@ -154,11 +154,13 @@ const zeta_num = Complex.make(
 );
 
 function sumComplex(...values: Complex.Complex[]): Complex.Complex {
-  let sum = Complex.zero;
-  for (const value of values) sum = Complex.add(sum, value);
-  return sum;
+  let real = 0.0;
+  let imag = 0.0;
+  for (const value of values) [real, imag] = [real + value.real, imag + value.imag];
+  return Complex.make(real, imag);
 }
 
+// TODO: precision problem
 export function toComplex(value: CyclotomicField5): Complex.Complex {
   const a0 = Complex.make(Rational.toNumber(value._0), 0.0);
   const a1 = Complex.make(Rational.toNumber(value._1), 0.0);

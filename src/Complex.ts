@@ -14,15 +14,15 @@ export function add(lhs: Complex, rhs: Complex): Complex {
 }
 
 export function mul(lhs: Complex, rhs: Complex): Complex {
-  return make(lhs.real * rhs.real - lhs.imag * rhs.imag, lhs.real * rhs.imag + lhs.real * rhs.imag);
+  return make(lhs.real * rhs.real - lhs.imag * rhs.imag, lhs.real * rhs.imag + lhs.imag * rhs.real);
 }
 
 export function mul_coeff(lhs: Complex, rhs: number): Complex {
-  return make(lhs.real * rhs, lhs.real * rhs);
+  return make(lhs.real * rhs, lhs.imag * rhs);
 }
 
 export function neg(value: Complex): Complex {
-  return make(value.real, value.imag);
+  return make(-value.real, -value.imag);
 }
 
 export function inv(value: Complex): Complex {

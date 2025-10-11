@@ -7,11 +7,11 @@ function gcd(a: bigint, b: bigint): bigint {
 }
 
 function abs(a: bigint): bigint {
-  return a < 0 ? -a : a;
+  return a < 0n ? -a : a;
 }
 
 function sign(a: bigint): bigint {
-  return a < 0 ? -1n : a > 0 ? 1n : 0n;
+  return a < 0n ? -1n : a > 0n ? 1n : 0n;
 }
 
 export function make(n: bigint, d: bigint): Rational {
@@ -20,47 +20,48 @@ export function make(n: bigint, d: bigint): Rational {
   return Object.freeze({numerator: n / c * sign(d), denominator: abs(d) / c});
 }
 
-export function fromInt(a: number): Rational {
-  return Object.freeze({numerator: BigInt(a), denominator: 1n});
+export function fromInt(value: number): Rational {
+  return Object.freeze({numerator: BigInt(value), denominator: 1n});
 }
 
 export function toNumber(value: Rational): number {
-  return Number(value.numerator) / Number(value.denominator);
+  return Number(value.numerator / value.denominator)
+    + Number(value.numerator % value.denominator) / Number(value.denominator);
 }
 
-export function eq(a: Rational, b: Rational): boolean {
-  return a.numerator == b.numerator && a.denominator == b.denominator;
+export function eq(lhs: Rational, rhs: Rational): boolean {
+  return lhs.numerator === rhs.numerator && lhs.denominator === rhs.denominator;
 }
 
-export function compare(a: Rational, b: Rational): -1 | 0 | 1 {
-  const l = a.numerator * b.denominator;
-  const r = a.denominator * b.numerator;
+export function compare(lhs: Rational, rhs: Rational): -1 | 0 | 1 {
+  const l = lhs.numerator * rhs.denominator;
+  const r = lhs.denominator * rhs.numerator;
   return l < r ? -1 : l == r ? 0 : 1;
 }
 
-export function add(a: Rational, b: Rational): Rational {
-  return make(a.numerator * b.denominator + a.denominator * b.numerator, a.denominator * b.denominator);
+export function add(lhs: Rational, rhs: Rational): Rational {
+  return make(lhs.numerator * rhs.denominator + lhs.denominator * rhs.numerator, lhs.denominator * rhs.denominator);
 }
 
-export function mul(a: Rational, b: Rational): Rational {
-  return make(a.numerator * b.numerator, a.denominator * b.denominator);
+export function mul(lhs: Rational, rhs: Rational): Rational {
+  return make(lhs.numerator * rhs.numerator, lhs.denominator * rhs.denominator);
 }
 
-export function neg(a: Rational): Rational {
-  return Object.freeze({numerator: -a.numerator, denominator: a.denominator});
+export function neg(value: Rational): Rational {
+  return Object.freeze({numerator: -value.numerator, denominator: value.denominator});
 }
 
-export function inv(a: Rational): Rational {
-  if (a.numerator === 0n) throw new Error(`inverse of 0/1`);
-  return Object.freeze({numerator: a.denominator * sign(a.numerator), denominator: abs(a.numerator)});
+export function inv(value: Rational): Rational {
+  if (value.numerator === 0n) throw new Error(`inverse of 0/1`);
+  return Object.freeze({numerator: value.denominator * sign(value.numerator), denominator: abs(value.numerator)});
 }
 
 export const zero = fromInt(0);
 
 export const one = fromInt(1);
 
-export function toString(r: Rational): string {
-  return `${r.numerator}/${r.denominator}`;
+export function toString(value: Rational): string {
+  return `${value.numerator}/${value.denominator}`;
 }
 
 function parseFloatAsRational(input: string): Rational {
