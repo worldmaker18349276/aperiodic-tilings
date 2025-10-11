@@ -1,5 +1,6 @@
 import * as Rational from "./Rational";
 import * as Complex from "./Complex";
+import * as GoldenField from "./GoldenField";
 
 export type CyclotomicField5 = {
   readonly _0: Rational.Rational,
@@ -160,7 +161,6 @@ function sumComplex(...values: Complex.Complex[]): Complex.Complex {
   return Complex.make(real, imag);
 }
 
-// TODO: precision problem
 export function toComplex(value: CyclotomicField5): Complex.Complex {
   const a0 = Complex.make(Rational.toNumber(value._0), 0.0);
   const a1 = Complex.make(Rational.toNumber(value._1), 0.0);
@@ -175,4 +175,32 @@ export function toComplex(value: CyclotomicField5): Complex.Complex {
     Complex.mul(a2, z2),
     Complex.mul(a3, z3),
   );
+}
+
+export function toString(value: CyclotomicField5): string {
+  return `${value._0} + ${value._1} zeta + ${value._2} zeta^2 + ${value._3} zeta^3`;
+}
+
+// Re(zeta) = 1/2 phi^-1 = (sqrt(5) - 1) / 4
+const zeta_real = Object.freeze({
+  _a: Rational.make(-1n, 4n),
+  _b: Rational.make(1n, 4n),
+});
+
+// Re(zeta^2) = -1/2 phi = (-sqrt(5) - 1) / 4
+const zeta2_real = Object.freeze({
+  _a: Rational.make(-1n, 4n),
+  _b: Rational.make(-1n, 4n),
+});
+
+export function real(value: CyclotomicField5): GoldenField.GoldenField {
+  let _a = value._0;
+  let _b = Rational.zero;
+  _a = Rational.add(_a, Rational.mul(value._1, zeta_real._a));
+  _b = Rational.add(_b, Rational.mul(value._1, zeta_real._b));
+  _a = Rational.add(_a, Rational.mul(value._2, zeta2_real._a));
+  _b = Rational.add(_b, Rational.mul(value._2, zeta2_real._b));
+  _a = Rational.add(_a, Rational.mul(value._3, zeta2_real._a));
+  _b = Rational.add(_b, Rational.mul(value._3, zeta2_real._b));
+  return Object.freeze({_a, _b});
 }

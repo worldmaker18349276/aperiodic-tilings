@@ -1,10 +1,20 @@
 import * as CF5 from "./CyclotomicField5";
+import * as GF from "./GoldenField";
 import * as Rational from "./Rational";
 
 export type BBox = {
-  readonly bl: Rational.Rational,
-  readonly tr: Rational.Rational,
+  readonly bl: CF5.CyclotomicField5,
+  readonly tr: CF5.CyclotomicField5,
 };
+
+export function make(
+  left: Rational.Rational,
+  bottom: Rational.Rational,
+  right: Rational.Rational,
+  top: Rational.Rational,
+): BBox {
+  throw new Error("not implemented");
+}
 
 export type Triangle = {
   readonly a: CF5.CyclotomicField5,
@@ -14,82 +24,79 @@ export type Triangle = {
 
 export enum IntersectionResult {Disjoint, Intersect, Contain}
 
-export function intersect({a, b, c}: Triangle, bbox: BBox): IntersectionResult {
-  // const r = CF5.inv(CF5.add(a, CF5.neg(b)));
-  // const neg_b = CF5.neg(b);
-  // const trans = (z: CF5.CyclotomicField5) => CF5.mul(CF5.add(z, neg_b), r);
-  // const real = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.conj(z)), Rational.make(1n, 2n));
-  // const imag = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.neg(CF5.conj(z))), Rational.make(1n, 2n));
-  // const a_ = Complex.one; // CF5.toComplex(trans(a));
-  // const b_ = Complex.zero; // CF5.toComplex(trans(b));
-  // const c_ = CF5.toComplex(trans(c));
-  // const bl_ = CF5.toComplex(trans(bbox.bl));
-  // const tr_ = CF5.toComplex(trans(bbox.tr));
-  // const br = CF5.add(real(bbox.tr), imag(bbox.bl));
-  // const tl = CF5.add(real(bbox.bl), imag(bbox.tr));
-  // const br_ = CF5.toComplex(trans(br));
-  // const tl_ = CF5.toComplex(trans(tl));
-  // return intersectNumeric(a_, b_, c_, bl_, br_, tr_, tl_);
-  throw new Error("not implemented");
+const real = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.conj(z)), Rational.make(1n, 2n));
+const imag = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.neg(CF5.conj(z))), Rational.make(1n, 2n));
+
+function minGolden(rs: GF.GoldenField[]): GF.GoldenField {
+  let r0 = rs[0]!;
+  for (const r of rs) {
+    if (GF.compare(r0, r) > 0) r0 = r;
+  }
+  return r0;
 }
 
-// function intersectNumeric(
-//   a: Complex.Complex,
-//   b: Complex.Complex,
-//   c: Complex.Complex,
-//   bl: Complex.Complex,
-//   br: Complex.Complex,
-//   tr: Complex.Complex,
-//   tl: Complex.Complex,
-// ): IntersectionResult {
+function maxGolden(rs: GF.GoldenField[]): GF.GoldenField {
+  let r0 = rs[0]!;
+  for (const r of rs) {
+    if (GF.compare(r0, r) < 0) r0 = r;
+  }
+  return r0;
+}
+
+function intersectAlong(
+  a: CF5.CyclotomicField5[], b: CF5.CyclotomicField5[],
+  x: CF5.CyclotomicField5, y: CF5.CyclotomicField5,
+): IntersectionResult {
+  const r = CF5.inv(CF5.add(y, CF5.neg(x)));
+  const proj = (a: CF5.CyclotomicField5) => CF5.real(CF5.mul(a, r));
+  const a_ = a.map(e => proj(e));
+  const b_ = b.map(e => proj(e));
   
-//   function check_axis(x: Complex.Complex, y: Complex.Complex): boolean {
-//     const neg_x = Complex.neg(x);
-//     const r = Complex.inv(Complex.add(y, neg_x));
-//     const proj = (a: Complex.Complex) => Complex.mul(Complex.add(a, neg_x), r).real;
-//     const a_ = proj(a);
-//     const b_ = proj(b);
-//     const c_ = proj(c);
-//     const bl_ = proj(bl);
-//     const tr_ = proj(tr);
-//     const br_ = proj(br);
-//     const tl_ = proj(tl);
-    
-//     const tri_min = Math.min(a_, b_, c_);
-//     const tri_max = Math.max(a_, b_, c_);
-//     const box_min = Math.min(bl_, tr_, br_, tl_);
-//     const box_max = Math.max(bl_, tr_, br_, tl_);
-    
-//     return box_max < tri_min && tri_max < box_min;
-//   }
+  const a_min = minGolden(a_);
+  const a_max = maxGolden(a_);
+  const b_min = minGolden(b_);
+  const b_max = maxGolden(b_);
   
-//   // checkAxis :: Complex Number -> Complex Number -> Boolean
-//   // checkAxis x y = box_max < tri_min && tri_max < box_min
-//   //   where
-//   //   a' = real ((a - x) / (y - x))
-//   //   b' = real ((b - x) / (y - x))
-//   //   c' = real ((c - x) / (y - x))
-//   //   bl' = real ((bl - x) / (y - x))
-//   //   tr' = real ((tr - x) / (y - x))
-//   //   br' = real ((br - x) / (y - x))
-//   //   tl' = real ((tl - x) / (y - x))
-//   //   tri_min = a' `min` b' `min` c'
-//   //   tri_max = a' `max` b' `max` c'
-//   //   box_min = bl' `min` tr' `min` br' `min` tl'
-//   //   box_max = bl' `max` tr' `max` br' `max` tl'
+  if (GF.compare(b_max, a_min) < 0 || GF.compare(a_max, b_min) < 0) {
+    return IntersectionResult.Disjoint;
+  }
+  if (GF.compare(a_min, b_min) < 0 && GF.compare(b_max, a_max) < 0) {
+    return IntersectionResult.Contain;
+  }
+  return IntersectionResult.Intersect;
+}
+
+export function intersect({a, b, c}: Triangle, bbox: BBox): IntersectionResult {
+  const bl = bbox.bl;
+  const tr = bbox.tr;
+  const br = CF5.add(real(bbox.tr), imag(bbox.bl));
+  const tl = CF5.add(real(bbox.bl), imag(bbox.tr));
   
-//   // if
-//   //   contain {a, b, c} bl && contain {a, b, c} br
-//   //   && contain {a, b, c} tr && contain {a, b, c} tl
-//   // then
-//   //   Contain unit
-//   // else if
-//   //   checkAxis bl br && checkAxis br tr
-//   //   && checkAxis a b && checkAxis b c && checkAxis c a
-//   // then
-//   //   Intersect
-//   // else
-//   //   Disjoint
-//   // where
-  
-// }
+  const abc = [a, b, c];
+  const bltr = [bl, br, tr, tl];
+
+  const ab = intersectAlong(abc, bltr, a, b);
+  if (ab === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+  const bc = intersectAlong(abc, bltr, b, c);
+  if (bc === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+  const ca = intersectAlong(abc, bltr, c, a);
+  if (ca === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+
+  if (
+    ab === IntersectionResult.Contain
+    && bc === IntersectionResult.Contain
+    && ca === IntersectionResult.Contain
+  )
+    return IntersectionResult.Contain;
+
+  const b_ = intersectAlong(abc, bltr, bl, br);
+  if (b_ === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+  const r_ = intersectAlong(abc, bltr, br, tr);
+  if (r_ === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+  const t_ = intersectAlong(abc, bltr, tr, tl);
+  if (t_ === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+  const l_ = intersectAlong(abc, bltr, tl, bl);
+  if (l_ === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+
+  return IntersectionResult.Intersect;
+}

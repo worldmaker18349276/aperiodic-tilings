@@ -38,3 +38,6 @@ export function conj(value: Complex): Complex {
   return make(value.real, -value.imag);
 }
 
+export function toString(value: Complex): string {
+  return `${value.real} + ${value.imag} i`;
+}
