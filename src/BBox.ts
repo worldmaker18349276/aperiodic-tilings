@@ -1,7 +1,7 @@
-import * as CF5 from "./CyclotomicField5";
-import * as GF from "./GoldenField";
-import * as Rational from "./Rational";
-import * as Approx from "./Approx";
+import * as CF5 from "./CyclotomicField5.js";
+import * as GF from "./GoldenField.js";
+import * as Rational from "./Rational.js";
+import * as Approx from "./Approx.js";
 
 export type BBox = {
   readonly bl: CF5.CyclotomicField5,

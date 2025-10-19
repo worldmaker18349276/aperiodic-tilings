@@ -1,5 +1,5 @@
-import * as CF5 from "./CyclotomicField5";
-import * as BBox from "./BBox";
+import * as CF5 from "./CyclotomicField5.js";
+import * as BBox from "./BBox.js";
 
 export class HalfTile {
   public readonly type: HalfTile.Type;

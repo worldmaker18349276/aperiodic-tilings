@@ -1,6 +1,6 @@
-import * as Rational from "./Rational";
-import * as Complex from "./Complex";
-import * as GoldenField from "./GoldenField";
+import * as Rational from "./Rational.js";
+import * as Complex from "./Complex.js";
+import * as GoldenField from "./GoldenField.js";
 
 export type CyclotomicField5 = {
   readonly _0: Rational.Rational,

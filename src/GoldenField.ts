@@ -1,4 +1,4 @@
-import * as Rational from "./Rational";
+import * as Rational from "./Rational.js";
 
 export type GoldenField = {
   readonly _a: Rational.Rational,
