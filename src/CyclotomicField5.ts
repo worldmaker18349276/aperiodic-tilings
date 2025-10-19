@@ -1,6 +1,7 @@
 import * as Rational from "./Rational.js";
 import * as Complex from "./Complex.js";
 import * as GoldenField from "./GoldenField.js";
+import * as Approx from "./Approx.js";
 
 export type CyclotomicField5 = {
   readonly _0: Rational.Rational,
@@ -102,7 +103,7 @@ export function mul(lhs: CyclotomicField5, rhs: CyclotomicField5): CyclotomicFie
   );
 }
 
-export function mul_coeff(lhs: CyclotomicField5, rhs: Rational.Rational): CyclotomicField5 {
+export function mulCoeff(lhs: CyclotomicField5, rhs: Rational.Rational): CyclotomicField5 {
   return make(
     Rational.mul(lhs._0, rhs),
     Rational.mul(lhs._1, rhs),
@@ -136,7 +137,7 @@ export function inv(value: CyclotomicField5): CyclotomicField5 {
   const conj_value = mul(mul(c1, c2), c3);
 
   const norm = mul(value, conj_value);
-  return mul_coeff(conj_value, Rational.inv(norm._0));
+  return mulCoeff(conj_value, Rational.inv(norm._0));
 }
 
 export function conj(value: CyclotomicField5): CyclotomicField5 {
@@ -149,46 +150,18 @@ export function conj(value: CyclotomicField5): CyclotomicField5 {
   );
 }
 
-const zeta_num = Complex.make(
-  Math.cos(2.0 * Math.PI / 5.0),
-  Math.sin(2.0 * Math.PI / 5.0),
-);
-
-function sumComplex(...values: Complex.Complex[]): Complex.Complex {
-  let real = 0.0;
-  let imag = 0.0;
-  for (const value of values) [real, imag] = [real + value.real, imag + value.imag];
-  return Complex.make(real, imag);
-}
-
-export function toComplex(value: CyclotomicField5): Complex.Complex {
-  const a0 = Complex.make(Rational.toNumber(value._0), 0.0);
-  const a1 = Complex.make(Rational.toNumber(value._1), 0.0);
-  const a2 = Complex.make(Rational.toNumber(value._2), 0.0);
-  const a3 = Complex.make(Rational.toNumber(value._3), 0.0);
-  const z1 = zeta_num;
-  const z2 = Complex.mul(z1, zeta_num);
-  const z3 = Complex.mul(z2, zeta_num);
-  return sumComplex(
-    a0,
-    Complex.mul(a1, z1),
-    Complex.mul(a2, z2),
-    Complex.mul(a3, z3),
-  );
-}
-
 export function toString(value: CyclotomicField5): string {
   return `${value._0} + ${value._1} zeta + ${value._2} zeta^2 + ${value._3} zeta^3`;
 }
 
 // Re(zeta) = 1/2 phi^-1 = (sqrt(5) - 1) / 4
-const zeta_real = Object.freeze({
+const zeta_real: GoldenField.GoldenField = Object.freeze({
   _a: Rational.make(-1n, 4n),
   _b: Rational.make(1n, 4n),
 });
 
 // Re(zeta^2) = -1/2 phi = (-sqrt(5) - 1) / 4
-const zeta2_real = Object.freeze({
+const zeta2_real: GoldenField.GoldenField = Object.freeze({
   _a: Rational.make(-1n, 4n),
   _b: Rational.make(-1n, 4n),
 });
@@ -204,3 +177,22 @@ export function real(value: CyclotomicField5): GoldenField.GoldenField {
   _b = Rational.add(_b, Rational.mul(value._3, zeta2_real._b));
   return Object.freeze({_a, _b});
 }
+
+// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
+const neg_zeta_imag: CyclotomicField5 = Object.freeze({
+  _0: Rational.make(-1n, 2n),
+  _1: Rational.make(-1n, 1n),
+  _2: Rational.make(-1n, 2n),
+  _3: Rational.make(-1n, 2n),
+});
+
+export function approxToComplex(value: CyclotomicField5, floor: [boolean, boolean], eps: bigint = BigInt(1e9)): Complex.Complex {
+  const re = GoldenField.approxToRational(real(value), floor[0], eps);
+  const value_ = mul(value, neg_zeta_imag);
+  const eps_ = eps * 20n / 19n; // = eps / Im(zeta)
+  const im_ = GoldenField.approxToRational(real(value_), floor[1], eps_);
+  const [n, d] = Approx.mul_zeta_imag([im_.numerator, im_.denominator], floor[1], eps);
+  const im = Rational.make(n, d);
+  return Complex.make(re, im);
+}
+

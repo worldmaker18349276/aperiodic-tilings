@@ -1,4 +1,5 @@
 import * as Rational from "./Rational.js";
+import * as Approx from "./Approx.js";
 
 export type GoldenField = {
   readonly _a: Rational.Rational,
@@ -69,7 +70,7 @@ export function mul(lhs: GoldenField, rhs: GoldenField): GoldenField {
   );
 }
 
-export function mul_coeff(lhs: GoldenField, rhs: Rational.Rational): GoldenField {
+export function mulCoeff(lhs: GoldenField, rhs: Rational.Rational): GoldenField {
   return make(
     Rational.mul(lhs._a, rhs),
     Rational.mul(lhs._b, rhs),
@@ -87,8 +88,9 @@ export function inv(value: GoldenField): GoldenField {
   );
 }
 
-export function toNumber(value: GoldenField): number {
-  return Rational.toNumber(value._a) + Rational.toNumber(value._b) * Math.sqrt(5);
+export function approxToRational(value: GoldenField, floor: boolean, eps: bigint = BigInt(1e9)): Rational.Rational {
+  const [n, d] = Approx.mul_sqrt5([value._b.numerator, value._b.denominator], floor, eps);
+  return Rational.add(value._a, Rational.make(n, d));
 }
 
 export function toString(value: GoldenField): string {

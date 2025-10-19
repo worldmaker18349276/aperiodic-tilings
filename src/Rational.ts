@@ -24,7 +24,7 @@ export function fromInt(value: number): Rational {
   return Object.freeze({numerator: BigInt(value), denominator: 1n});
 }
 
-export function toNumber(value: Rational): number {
+export function approxToNumber(value: Rational): number {
   return Number(value.numerator / value.denominator)
     + Number(value.numerator % value.denominator) / Number(value.denominator);
 }

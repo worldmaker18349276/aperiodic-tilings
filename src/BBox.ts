@@ -8,7 +8,7 @@ export type BBox = {
   readonly tr: CF5.CyclotomicField5,
 };
 
-export function make(
+export function makeApprox(
   left: Rational.Rational,
   bottom: Rational.Rational,
   right: Rational.Rational,
@@ -31,8 +31,8 @@ export type Triangle = {
 
 export enum IntersectionResult {Disjoint, Intersect, Contain}
 
-const real = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.conj(z)), Rational.make(1n, 2n));
-const imag = (z: CF5.CyclotomicField5) => CF5.mul_coeff(CF5.add(z, CF5.neg(CF5.conj(z))), Rational.make(1n, 2n));
+const real = (z: CF5.CyclotomicField5) => CF5.mulCoeff(CF5.add(z, CF5.conj(z)), Rational.make(1n, 2n));
+const imag = (z: CF5.CyclotomicField5) => CF5.mulCoeff(CF5.add(z, CF5.neg(CF5.conj(z))), Rational.make(1n, 2n));
 
 function minGolden(rs: GF.GoldenField[]): GF.GoldenField {
   let r0 = rs[0]!;
