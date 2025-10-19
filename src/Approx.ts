@@ -171,19 +171,35 @@ const zeta2_imag_sq_approx: Rational = [
   BigInt(1e+9),
 ];
 
-// approximate value * Im(zeta)^2
-export function mul_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  return mul_zeta_imag_sq_(value, zeta_imag_sq_approx, floor, eps);
+// approximate value * Im(zeta)
+export function mul_zeta_imag(value: Rational, floor: boolean, eps: bigint): Rational {
+  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
+  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
+  if (sgn === -1n) floor = !floor;
+  const [n, d] = sqrt(mul_zeta_imag_sq_(value_sq, zeta_imag_sq_approx, floor, eps * eps), floor, eps)!;
+  return [sgn * n, d];
 }
-// approximate value / Im(zeta)^2
-export function div_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  return div_zeta_imag_sq_(value, [zeta_imag_sq_approx[1], zeta_imag_sq_approx[0]], floor, eps);
+// approximate value / Im(zeta)
+export function div_zeta_imag(value: Rational, floor: boolean, eps: bigint): Rational {
+  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
+  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
+  if (sgn === -1n) floor = !floor;
+  const [n, d] = sqrt(div_zeta_imag_sq_(value_sq, [zeta_imag_sq_approx[1], zeta_imag_sq_approx[0]], floor, eps * eps), floor, eps)!;
+  return [sgn * n, d];
 }
-// approximate value * Im(zeta^2)^2
-export function mul_zeta2_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  return mul_zeta_imag_sq_(value, zeta2_imag_sq_approx, floor, eps);
+// approximate value * Im(zeta^2)
+export function mul_zeta2_imag(value: Rational, floor: boolean, eps: bigint): Rational {
+  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
+  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
+  if (sgn === -1n) floor = !floor;
+  const [n, d] = sqrt(mul_zeta_imag_sq_(value_sq, zeta2_imag_sq_approx, floor, eps * eps), floor, eps)!;
+  return [sgn * n, d];
 }
-// approximate value / Im(zeta^2)^2
-export function div_zeta2_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  return div_zeta_imag_sq_(value, [zeta2_imag_sq_approx[1], zeta2_imag_sq_approx[0]], floor, eps);
+// approximate value / Im(zeta^2)
+export function div_zeta2_imag(value: Rational, floor: boolean, eps: bigint): Rational {
+  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
+  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
+  if (sgn === -1n) floor = !floor;
+  const [n, d] = sqrt(div_zeta_imag_sq_(value_sq, [zeta2_imag_sq_approx[1], zeta2_imag_sq_approx[0]], floor, eps * eps), floor, eps)!;
+  return [sgn * n, d];
 }

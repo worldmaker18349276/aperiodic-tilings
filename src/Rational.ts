@@ -56,6 +56,14 @@ export function inv(value: Rational): Rational {
   return Object.freeze({numerator: value.denominator * sign(value.numerator), denominator: abs(value.numerator)});
 }
 
+export function integer(value: Rational): bigint {
+  return value.numerator / value.denominator;
+}
+
+export function fractional(value: Rational): Rational {
+  return Object.freeze({numerator: value.numerator % value.denominator, denominator: value.denominator});
+}
+
 export const zero = fromInt(0);
 
 export const one = fromInt(1);

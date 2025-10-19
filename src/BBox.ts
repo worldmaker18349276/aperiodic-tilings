@@ -1,6 +1,7 @@
 import * as CF5 from "./CyclotomicField5";
 import * as GF from "./GoldenField";
 import * as Rational from "./Rational";
+import * as Approx from "./Approx";
 
 export type BBox = {
   readonly bl: CF5.CyclotomicField5,
@@ -12,8 +13,14 @@ export function make(
   bottom: Rational.Rational,
   right: Rational.Rational,
   top: Rational.Rational,
+  eps: bigint = BigInt(1e9),
 ): BBox {
-  throw new Error("not implemented");
+  const bottom_ = Approx.div_zeta_imag([bottom.numerator, bottom.denominator], true, eps);
+  const top_ = Approx.div_zeta_imag([top.numerator, top.denominator], false, eps);
+  return Object.freeze({
+    bl: CF5.make(left, Rational.make(bottom_[0], bottom_[1]), Rational.zero, Rational.zero),
+    tr: CF5.make(right, Rational.make(top_[0], top_[1]), Rational.zero, Rational.zero),
+  });
 }
 
 export type Triangle = {
