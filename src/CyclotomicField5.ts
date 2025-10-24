@@ -1,3 +1,7 @@
+/// cyclotomic field of root 5.
+/// its real part is gold field.
+/// note that its reciprocal is complicated to compute.
+
 import * as Rational from "./Rational.js";
 import * as Complex from "./Complex.js";
 import * as GoldenField from "./GoldenField.js";

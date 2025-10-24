@@ -1,3 +1,4 @@
+/// rational number composed of two bigint
 
 export type Rational = {readonly numerator:bigint, readonly denominator:bigint};
 

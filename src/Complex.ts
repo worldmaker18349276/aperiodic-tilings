@@ -1,3 +1,5 @@
+/// complex number composed of two rational numbers
+
 import * as Rational from "./Rational.js";
 
 export type Complex = {readonly real: Rational.Rational, readonly imag: Rational.Rational};

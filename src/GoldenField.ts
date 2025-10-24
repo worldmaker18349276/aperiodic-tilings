@@ -1,3 +1,7 @@
+/// golden field (that is, Q(sqrt(5))).
+/// note that the order of gold field can be easily determined,
+/// which is very useful for BBox.
+
 import * as Rational from "./Rational.js";
 import * as Approx from "./Approx.js";
 

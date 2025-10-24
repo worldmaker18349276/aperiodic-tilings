@@ -1,3 +1,8 @@
+/// express Penrose half tile in CF5
+/// construct tree structure of half tile
+/// use BBox to capture visible part
+/// update the tree lazily
+
 import * as CF5 from "./CyclotomicField5.js";
 import * as BBox from "./BBox.js";
 

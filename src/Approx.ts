@@ -1,3 +1,5 @@
+/// approximate some algebraic operations on rational numbers in any precision
+/// such as sqaure root, multiply sqrt(5), multiply/divide by Im(zeta)
 
 function solve(f: (x: bigint) => bigint, x0: bigint, x1: bigint, floor: boolean): bigint {
   let y0 = f(x0);

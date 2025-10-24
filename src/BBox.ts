@@ -1,3 +1,9 @@
+/// bounding box on a complex plane, represented as CyclotomicField5.
+/// one can make a bounding box by given bound in rational numbers and given precision,
+/// it will find a slightly enlarged bounding box.
+/// it provides a method to check intersection relation between a triangle
+/// (also represented as CyclotomicField5) and a bounding box precisely.
+
 import * as CF5 from "./CyclotomicField5.js";
 import * as GF from "./GoldenField.js";
 import * as Rational from "./Rational.js";
