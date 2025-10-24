@@ -5,6 +5,7 @@
 
 import * as CF5 from "./CyclotomicField5.js";
 import * as BBox from "./BBox.js";
+import * as Approx from "./Approx.js";
 
 export class HalfTile {
   public readonly type: HalfTile.Type;
@@ -283,5 +284,21 @@ export class PenroseTree {
       this.level = tree_.level;
       this.root = tree_.root;
     }
+  }
+  
+  public getTriangles(bound: BBox.BBox, denominator: bigint = BigInt(1e9)): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
+    // get leaves
+    let nodes = [this.root];
+    for (let level = this.level; level > 0; level--) {
+      nodes = nodes.flatMap(node => node.children);
+    }
+    return nodes.map(node => node.value.tri)
+      .map(({a, b, c}) => {
+        return {
+          a: Approx.approxCyclotomicField5(a, bound, denominator),
+          b: Approx.approxCyclotomicField5(b, bound, denominator),
+          c: Approx.approxCyclotomicField5(c, bound, denominator),
+        };
+      });
   }
 }

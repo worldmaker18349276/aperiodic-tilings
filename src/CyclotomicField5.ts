@@ -3,9 +3,7 @@
 /// note that its reciprocal is complicated to compute.
 
 import * as Rational from "./Rational.js";
-import * as Complex from "./Complex.js";
 import * as GoldenField from "./GoldenField.js";
-import * as Approx from "./Approx.js";
 
 export type CyclotomicField5 = {
   readonly _0: Rational.Rational,
@@ -180,23 +178,5 @@ export function real(value: CyclotomicField5): GoldenField.GoldenField {
   _a = Rational.add(_a, Rational.mul(value._3, zeta2_real._a));
   _b = Rational.add(_b, Rational.mul(value._3, zeta2_real._b));
   return Object.freeze({_a, _b});
-}
-
-// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
-const neg_zeta_imag: CyclotomicField5 = Object.freeze({
-  _0: Rational.make(-1n, 2n),
-  _1: Rational.make(-1n, 1n),
-  _2: Rational.make(-1n, 2n),
-  _3: Rational.make(-1n, 2n),
-});
-
-export function approxToComplex(value: CyclotomicField5, floor: [boolean, boolean], eps: bigint = BigInt(1e9)): Complex.Complex {
-  const re = GoldenField.approxToRational(real(value), floor[0], eps);
-  const value_ = mul(value, neg_zeta_imag);
-  const eps_ = eps * 20n / 19n; // = eps / Im(zeta)
-  const im_ = GoldenField.approxToRational(real(value_), floor[1], eps_);
-  const [n, d] = Approx.mul_zeta_imag([im_.numerator, im_.denominator], floor[1], eps);
-  const im = Rational.make(n, d);
-  return Complex.make(re, im);
 }
 

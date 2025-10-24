@@ -1,5 +1,11 @@
-/// approximate some algebraic operations on rational numbers in any precision
-/// such as sqaure root, multiply sqrt(5), multiply/divide by Im(zeta)
+/// approximate conversion between floating point/rational numbers and the extension fields.
+/// it is done by approximating some algebraic operations on rational numbers in any precision,
+/// such as sqrt(_), _ * sqrt(5), _ / Im(zeta)^2.
+
+import * as Rational from "./Rational.js";
+import * as BBox from "./BBox.js";
+import * as CF5 from "./CyclotomicField5.js";
+import * as GF from "./GoldenField.js";
 
 function solve(f: (x: bigint) => bigint, x0: bigint, x1: bigint, floor: boolean): bigint {
   let y0 = f(x0);
@@ -45,42 +51,37 @@ function solve(f: (x: bigint) => bigint, x0: bigint, x1: bigint, floor: boolean)
   }  
 }
 
-type Rational = [n:bigint, d:bigint];
-
 // approximate sqrt(value)
-export function sqrt(value: Rational, floor: boolean, eps: bigint): Rational | undefined {
-  if (value[0] < 0n) return;
+function sqrt(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational | undefined {
+  if (value.numerator < 0n) return;
 
   // x^2 - r = 0
   // let n/d = x, a/b = r
   // solve f(n) = b n^2 - a d^2
 
-  const sqrt_num = Number(value[0]) / Number(value[1]);
+  const sqrt_num = Rational.approxToNumber(value);
 
-  let n = BigInt(Math.floor(sqrt_num * Number(eps)));
-  let d = eps;
+  let n = BigInt(Math.floor(sqrt_num * Number(denominator)));
+  let d = denominator;
   
-  const a = value[0];
-  const b = value[1];
+  const a = value.numerator;
+  const b = value.denominator;
   const _ad2 = a * d ** 2n;
   n = solve(n => b * n ** 2n - _ad2, n, n + 1n, floor);
   
-  return [n, d];
+  return Rational.make(n, d);
 }
 
-
-
 // sqrt(5) ceiling approximation
-const sqrt5_approx: Rational = [
+const sqrt5_approx = Rational.make(
   BigInt(Math.ceil(Math.sqrt(5)) * 1e+9),
   BigInt(1e+9),
-];
+);
 
 // approximate value * sqrt(5)
-export function mul_sqrt5(value: Rational, floor: boolean, eps: bigint): Rational {
-  if (value[0] < 0n) {
-    const [n, d] = mul_sqrt5([-value[0], value[1]], !floor, eps);
-    return [-n, d];
+function mul_sqrt5(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
+  if (value.numerator < 0n) {
+    return Rational.neg(mul_sqrt5(Rational.neg(value), !floor, denominator));
   }
 
   // sqrt(5) r - x = 0
@@ -88,59 +89,31 @@ export function mul_sqrt5(value: Rational, floor: boolean, eps: bigint): Rationa
   // let n/d = x, a/b = r^2
   // solve f(n) = b n^2 - 5 a d^2
 
-  let n = value[0] * sqrt5_approx[0];
-  let d = value[1] * sqrt5_approx[1];
-  while (d < eps) {
+  let n = value.numerator * sqrt5_approx.numerator;
+  let d = value.denominator * sqrt5_approx.denominator;
+  while (d < denominator) {
     n *= 2n;
     d *= 2n;
   }
   
-  const a = value[0] * value[0];
-  const b = value[1] * value[1];
+  const a = value.numerator * value.numerator;
+  const b = value.denominator * value.denominator;
   const _5ad2 = 5n * a * d ** 2n;
   n = solve(n => b * n ** 2n - _5ad2, n, n - 1n, floor);
   
-  return [n, d];
+  return Rational.make(n, d);
 }
-
 
 // Im(zeta)^2 ceiling approximation
-const zeta_imag_sq_approx: Rational = [
+const zeta_imag_sq_approx = Rational.make(
   BigInt(Math.ceil((5 + Math.sqrt(5))/8 * 1e+9)),
   BigInt(1e+9),
-];
+);
 
-function mul_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  if (value[0] < 0n) {
-    const [n, d] = mul_zeta_imag_sq([-value[0], value[1]], !floor, eps);
-    return [-n, d];
-  }
-  // Im(zeta)^2 r - x = 0
-  // 5/8 r +- sqrt(5)/8 r - x = 0
-  // (5 r - 8 x)^2 - 5 r^2 = 0
-  // let n/d = x, a/b = r
-  // solve f(n) = (5 a d - 8 b n)^2 - 5 a^2 d^2 = 0
-  
-  let n = value[0] * zeta_imag_sq_approx[0];
-  let d = value[1] * zeta_imag_sq_approx[1];
-  while (d < eps) {
-    n *= 2n;
-    d *= 2n;
-  }
-
-  const a = value[0];
-  const b = value[1];
-  const _5ad = 5n * a * d;
-  const f = (n: bigint) => (8n * b * n - _5ad) ** 2n - _5ad ** 2n / 5n;
-  n = solve(f, n, n - 1n, floor);
-  
-  return [n, d];
-}
-
-function div_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rational {
-  if (value[0] < 0n) {
-    const [n, d] = div_zeta_imag_sq([-value[0], value[1]], !floor, eps);
-    return [-n, d];
+// approximate value / Im(zeta)^2
+function div_zeta_imag_sq(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
+  if (value.numerator < 0n) {
+    return Rational.neg(div_zeta_imag_sq(Rational.neg(value), !floor, denominator));
   }
   // Im(zeta)^2 x - r = 0
   // 5/8 x +- sqrt(5)/8 x - r = 0
@@ -148,15 +121,15 @@ function div_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rationa
   // let n/d = x, a/b = r
   // solve f(n) = (5 b n - 8 a d)^2 - 5 b^2 n^2 = 0
   
-  let n = value[0] * zeta_imag_sq_approx[1];
-  let d = value[1] * zeta_imag_sq_approx[0];
-  while (d < eps) {
+  let n = value.numerator * zeta_imag_sq_approx.denominator;
+  let d = value.denominator * zeta_imag_sq_approx.numerator;
+  while (d < denominator) {
     n *= 2n;
     d *= 2n;
   }
 
-  const a = value[0];
-  const b = value[1];
+  const a = value.numerator;
+  const b = value.denominator;
   const _8ad = 8n * a * d;
   const f = (n: bigint) => {
     let _5bn = 5n * b * n;
@@ -164,22 +137,63 @@ function div_zeta_imag_sq(value: Rational, floor: boolean, eps: bigint): Rationa
   };
   n = solve(f, n, n - 1n, floor);
   
-  return [n, d];
+  return Rational.make(n, d);
 }
 
-// approximate value * Im(zeta)
-export function mul_zeta_imag(value: Rational, floor: boolean, eps: bigint): Rational {
-  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
-  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
-  if (sgn === -1n) floor = !floor;
-  const [n, d] = sqrt(mul_zeta_imag_sq(value_sq, floor, eps * eps), floor, eps)!;
-  return [sgn * n, d];
-}
 // approximate value / Im(zeta)
-export function div_zeta_imag(value: Rational, floor: boolean, eps: bigint): Rational {
-  const value_sq: Rational = [value[0]*value[0], value[1]*value[1]];
-  const sgn = (value[0] >= 0) === (value[1] >= 0) ? 1n : -1n;
+function div_zeta_imag(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
+  const value_sq = Rational.mul(value, value);
+  const sgn = (value.numerator >= 0) === (value.denominator >= 0) ? 1n : -1n;
   if (sgn === -1n) floor = !floor;
-  const [n, d] = sqrt(div_zeta_imag_sq(value_sq, floor, eps * eps), floor, eps)!;
-  return [sgn * n, d];
+  //                                                 vvvvvvvvvvvvvvvvv--- no, this is wrong...
+  const res = sqrt(div_zeta_imag_sq(value_sq, floor, denominator ** 2n), floor, denominator)!;
+  return sgn === -1n ? Rational.neg(res) : res;
+}
+
+
+// approximate a bounding box by given boundary in rational numbers.
+export function approxBBox(
+  left: Rational.Rational,
+  bottom: Rational.Rational,
+  right: Rational.Rational,
+  top: Rational.Rational,
+  denominator: bigint = BigInt(1e9),
+): BBox.BBox {
+  return BBox.make(
+    CF5.make(left, div_zeta_imag(bottom, true, denominator), Rational.zero, Rational.zero),
+    CF5.make(right, div_zeta_imag(top, false, denominator), Rational.zero, Rational.zero),
+  );
+}
+
+function approxGoldenField(value: GF.GoldenField, floor: boolean, denominator: bigint): Rational.Rational {
+  return Rational.add(value._a, mul_sqrt5(value._b, floor, denominator));
+}
+
+// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
+const neg_zeta_imag: CF5.CyclotomicField5 = Object.freeze({
+  _0: Rational.make(-1n, 2n),
+  _1: Rational.make(-1n, 1n),
+  _2: Rational.make(-1n, 2n),
+  _3: Rational.make(-1n, 2n),
+});
+
+export type Complex = {readonly re: number, readonly im: number};
+
+// approximate CF5 as floating numbers in the coordinate of given frame box (1 represents top/right edge).
+export function approxCyclotomicField5(value: CF5.CyclotomicField5, frame: BBox.BBox, denominator: bigint): Complex {
+  const offset = CF5.neg(frame.bl);
+  const extent = CF5.add(frame.tr, offset);
+  const value_ = CF5.add(value, offset);
+
+  const width = CF5.real(extent);
+  const value_x = CF5.real(value_);
+  const re_ = approxGoldenField(GF.mul(value_x, GF.inv(width)), true, denominator);
+  const re = Rational.approxToNumber(re_);
+
+  const height = CF5.real(CF5.mul(extent, neg_zeta_imag));
+  const value_y = CF5.real(CF5.mul(value_, neg_zeta_imag));
+  const im_ = approxGoldenField(GF.mul(value_y, GF.inv(height)), true, denominator);
+  const im = Rational.approxToNumber(im_);
+
+  return Object.freeze({re, im});
 }

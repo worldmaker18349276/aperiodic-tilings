@@ -3,7 +3,6 @@
 /// which is very useful for BBox.
 
 import * as Rational from "./Rational.js";
-import * as Approx from "./Approx.js";
 
 export type GoldenField = {
   readonly _a: Rational.Rational,
@@ -90,11 +89,6 @@ export function inv(value: GoldenField): GoldenField {
     Rational.mul(value._a, n),
     Rational.mul(Rational.neg(value._b), n),
   );
-}
-
-export function approxToRational(value: GoldenField, floor: boolean, eps: bigint = BigInt(1e9)): Rational.Rational {
-  const [n, d] = Approx.mul_sqrt5([value._b.numerator, value._b.denominator], floor, eps);
-  return Rational.add(value._a, Rational.make(n, d));
 }
 
 export function toString(value: GoldenField): string {

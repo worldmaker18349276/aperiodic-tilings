@@ -1,32 +1,18 @@
 /// bounding box on a complex plane, represented as CyclotomicField5.
-/// one can make a bounding box by given bound in rational numbers and given precision,
-/// it will find a slightly enlarged bounding box.
 /// it provides a method to check intersection relation between a triangle
 /// (also represented as CyclotomicField5) and a bounding box precisely.
 
 import * as CF5 from "./CyclotomicField5.js";
 import * as GF from "./GoldenField.js";
 import * as Rational from "./Rational.js";
-import * as Approx from "./Approx.js";
 
 export type BBox = {
   readonly bl: CF5.CyclotomicField5,
   readonly tr: CF5.CyclotomicField5,
 };
 
-export function makeApprox(
-  left: Rational.Rational,
-  bottom: Rational.Rational,
-  right: Rational.Rational,
-  top: Rational.Rational,
-  eps: bigint = BigInt(1e9),
-): BBox {
-  const bottom_ = Approx.div_zeta_imag([bottom.numerator, bottom.denominator], true, eps);
-  const top_ = Approx.div_zeta_imag([top.numerator, top.denominator], false, eps);
-  return Object.freeze({
-    bl: CF5.make(left, Rational.make(bottom_[0], bottom_[1]), Rational.zero, Rational.zero),
-    tr: CF5.make(right, Rational.make(top_[0], top_[1]), Rational.zero, Rational.zero),
-  });
+export function make(bl: CF5.CyclotomicField5, tr: CF5.CyclotomicField5): BBox {
+  return Object.freeze({bl, tr});
 }
 
 export type Triangle = {
