@@ -17,7 +17,9 @@ export class State {
     lastY: 0,
   };
   #zoom_state = {
-    deltaY: 0.0,
+    deltaY: 0,
+    deltaY_step: 50,
+    zoom_delay: 1000,
     when: Date.now(),
   };
   #canvas: HTMLCanvasElement;
@@ -25,7 +27,7 @@ export class State {
   #bound: BBox.BBox;
   #tree: Penrose.PenroseTree;
 
-  #zoom0 = Rational.make(9n, 10n);
+  #zoom0 = Rational.make(19n, 20n);
   
   constructor(canvas: HTMLCanvasElement, inner_frame: [number, number] = [0.2, 0.8]) {
     this.#inner_frame = inner_frame;
@@ -68,14 +70,13 @@ export class State {
     };
     this.#canvas.onwheel = e => {
       e.preventDefault();
-      if (Date.now() - this.#zoom_state.when > 1000.0) this.#zoom_state.deltaY = 0;
+      if (Date.now() - this.#zoom_state.when > this.#zoom_state.zoom_delay) this.#zoom_state.deltaY = 0;
       this.#zoom_state.deltaY += e.deltaY;
-      const deltaY_step = 100;
-      const n = Math.round(this.#zoom_state.deltaY / deltaY_step);
-      this.#zoom_state.deltaY -= n * deltaY_step;
+      const n = Math.round(this.#zoom_state.deltaY / this.#zoom_state.deltaY_step);
+      this.#zoom_state.deltaY -= n * this.#zoom_state.deltaY_step;
       this.#zoom_state.when = Date.now();
       if (n === 0) return;
-      const n_ = BigInt(n);
+      const n_ = BigInt(n > 0n ? n : -n);
       let zoom = Rational.make(this.#zoom0.numerator ** n_, this.#zoom0.denominator ** n_);
       if (e.deltaY > 0) zoom = Rational.inv(zoom);
       // console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);

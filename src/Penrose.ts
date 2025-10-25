@@ -235,23 +235,23 @@ export class PenroseTree {
     }
   }
 
-  static #refine_(tree: Tree<HalfTile>, depth: number, bound: BBox.BBox) {
-    if (depth === 0) return;
-    const res = BBox.intersect(tree.value.tri, bound);
-    if (res === BBox.IntersectionResult.Disjoint) {
-      tree.children = [];
-      return;
-    }
-    if (tree.children.length === 0) {
-      tree.children = tree.value.subdivision().map(value => ({value, children: []}));
-    }
-    for (const child of tree.children) {
-      PenroseTree.#refine_(child, depth-1, bound);
-    }
-  }
-
   #refine(bound: BBox.BBox) {
-    PenroseTree.#refine_(this.root, this.level * 8, bound);
+    const stack = [[this.root, this.level * 8] as const];
+    while (stack.length > 0) {
+      const [tree, depth] = stack.pop()!;
+      if (depth === 0) continue;
+      const res = BBox.intersect(tree.value.tri, bound);
+      if (res === BBox.IntersectionResult.Disjoint) {
+        tree.children = [];
+        continue;
+      }
+      if (tree.children.length === 0) {
+        tree.children = tree.value.subdivision().map(value => ({value, children: []}));
+      }
+      for (const child of tree.children) {
+        stack.push([child, depth-1]);
+      }
+    }
   }
 
   public update(bound: BBox.BBox) {

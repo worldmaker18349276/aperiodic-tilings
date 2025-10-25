@@ -2,7 +2,37 @@
 
 export type Rational = {readonly numerator:bigint, readonly denominator:bigint};
 
-function gcd(a: bigint, b: bigint): bigint {
+// // Stein's Algorithm, where a >= 0n && b >= 0n
+// export function gcd(a: bigint, b: bigint) {
+//   if (a === 0n) return b;
+//   if (b === 0n) return a;
+
+//   // Finding K, where K is the greatest power of 2 that divides both a and b.
+//   let k: bigint;
+//   for (k = 0n; ((a | b) & 1n) === 0n; k++) {
+//     a >>= 1n;
+//     b >>= 1n;
+//   }
+
+//   // Dividing a by 2 until a becomes odd
+//   while ((a & 1n) === 0n) a >>= 1n;
+
+//   // From here on, 'a' is always odd.
+//   do {
+//     // If b is even, remove all factor of 2 in b
+//     while ((b & 1n) === 0n) b >>= 1n;
+
+//     // Now a and b are both odd. Swap if necessary so a <= b, then set b = b - a (which is even).
+//     if (a > b) [a, b] = [b, a];
+
+//     b = b - a;
+//   } while (b !== 0n);
+
+//   // restore common factors of 2
+//   return a << k;
+// }
+
+export function gcd(a: bigint, b: bigint): bigint {
   while (a !== 0n) [a, b] = [b % a, a];
   return b;
 }
@@ -45,17 +75,36 @@ export function eq(lhs: Rational, rhs: Rational): boolean {
 }
 
 export function compare(lhs: Rational, rhs: Rational): -1 | 0 | 1 {
+  if (eq(lhs, rhs)) return 0;
+  const lhs_i = integer(lhs);
+  const rhs_i = integer(rhs);
+  if (lhs_i < rhs_i) return -1;
+  if (lhs_i > rhs_i) return +1;
   const l = lhs.numerator * rhs.denominator;
   const r = lhs.denominator * rhs.numerator;
   return l < r ? -1 : l == r ? 0 : 1;
 }
 
 export function add(lhs: Rational, rhs: Rational): Rational {
-  return make(lhs.numerator * rhs.denominator + lhs.denominator * rhs.numerator, lhs.denominator * rhs.denominator);
+  return make(
+    lhs.numerator * rhs.denominator + lhs.denominator * rhs.numerator,
+    lhs.denominator * rhs.denominator,
+  );
 }
 
 export function mul(lhs: Rational, rhs: Rational): Rational {
-  return make(lhs.numerator * rhs.numerator, lhs.denominator * rhs.denominator);
+  // return make(
+  //   lhs.numerator * rhs.numerator,
+  //   lhs.denominator * rhs.denominator,
+  // );
+  if (lhs.numerator === 0n) return zero;
+  if (rhs.numerator === 0n) return zero;
+  const lfactor = gcd(abs(lhs.numerator), rhs.denominator);
+  const rfactor = gcd(abs(rhs.numerator), lhs.denominator);
+  return Object.freeze({
+    numerator: (lhs.numerator / lfactor) * (rhs.numerator / rfactor),
+    denominator: (lhs.denominator / rfactor) * (rhs.denominator / lfactor),
+  });
 }
 
 export function neg(value: Rational): Rational {

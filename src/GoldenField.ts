@@ -30,17 +30,19 @@ export function eq(lhs: GoldenField, rhs: GoldenField): boolean {
 }
 
 export function compare(lhs: GoldenField, rhs: GoldenField): -1 | 0 | 1 {
-  return sign(add(lhs, neg(rhs)));
-}
+  const a_sgn = Rational.compare(lhs._a, rhs._a);
+  const b_sgn = Rational.compare(lhs._b, rhs._b);
+  if (a_sgn === 0) return b_sgn;
+  if (b_sgn === 0) return a_sgn;
+  if (a_sgn === b_sgn) return a_sgn;
 
-export function sign(value: GoldenField): -1 | 0 | 1 {
-  if (value._a.numerator === 0n && value._b.numerator === 0n) return 0;
-  if (value._a.numerator === 0n) return value._b.numerator > 0n ? +1 : -1;
-  if (value._b.numerator === 0n) return value._a.numerator > 0n ? +1 : -1;
-  if ((value._a.numerator > 0n) === (value._b.numerator > 0n)) return value._a.numerator > 0n ? +1 : -1;
+  const value = add(lhs, neg(rhs));
+
+  const factor = Rational.gcd(value._a.denominator, value._b.denominator);
+  const a = value._a.numerator * (value._b.denominator / factor);
+  const b = value._b.numerator * (value._a.denominator / factor);
+
   // => a + b sqrt(5)
-  const a = value._a.numerator * value._b.denominator;
-  const b = value._b.numerator * value._a.denominator;
   const a2 = a * a;
   const b2_5 = b * b * 5n;
   if (a2 > b2_5) {

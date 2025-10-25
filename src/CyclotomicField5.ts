@@ -1,6 +1,6 @@
 /// cyclotomic field of root 5.
 /// its real part is gold field.
-/// note that its reciprocal is complicated to compute.
+/// note that its multiplication and reciprocal are complicated to compute.
 
 import * as Rational from "./Rational.js";
 import * as GoldenField from "./GoldenField.js";
@@ -68,40 +68,34 @@ export function neg(val: CyclotomicField5): CyclotomicField5 {
   );
 }
 
-function sumRational(...values: Rational.Rational[]): Rational.Rational {
-  let sum = Rational.zero;
-  for (const value of values) sum = Rational.add(sum, value);
-  return sum;
-}
-
 export function mul(lhs: CyclotomicField5, rhs: CyclotomicField5): CyclotomicField5 {
   return make_(
-    sumRational(
+    [
       Rational.mul(lhs._0, rhs._0),
       Rational.mul(lhs._2, rhs._3),
       Rational.mul(lhs._3, rhs._2),
-    ),
-    sumRational(
+    ].reduce(Rational.add),
+    [
       Rational.mul(lhs._0, rhs._1),
       Rational.mul(lhs._1, rhs._0),
       Rational.mul(lhs._3, rhs._3),
-    ),
-    sumRational(
+    ].reduce(Rational.add),
+    [
       Rational.mul(lhs._0, rhs._2),
       Rational.mul(lhs._1, rhs._1),
       Rational.mul(lhs._2, rhs._0),
-    ),
-    sumRational(
+    ].reduce(Rational.add),
+    [
       Rational.mul(lhs._0, rhs._3),
       Rational.mul(lhs._1, rhs._2),
       Rational.mul(lhs._2, rhs._1),
       Rational.mul(lhs._3, rhs._0),
-    ),
-    sumRational(
+    ].reduce(Rational.add),
+    [
       Rational.mul(lhs._1, rhs._3),
       Rational.mul(lhs._2, rhs._2),
       Rational.mul(lhs._3, rhs._1)
-    ),
+    ].reduce(Rational.add),
   );
 }
 
@@ -177,6 +171,6 @@ export function real(value: CyclotomicField5): GoldenField.GoldenField {
   _b = Rational.add(_b, Rational.mul(value._2, zeta2_real._b));
   _a = Rational.add(_a, Rational.mul(value._3, zeta2_real._a));
   _b = Rational.add(_b, Rational.mul(value._3, zeta2_real._b));
-  return Object.freeze({_a, _b});
+  return GoldenField.make(_a, _b);
 }
 
