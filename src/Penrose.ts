@@ -6,8 +6,6 @@
 import * as CF5 from "./CyclotomicField5.js";
 import * as BBox from "./BBox.js";
 import * as Approx from "./Approx.js";
-export { approxBBox } from "./Approx.js";
-export * as Rational from "./Rational.js";
 
 export class HalfTile {
   public readonly type: HalfTile.Type;
