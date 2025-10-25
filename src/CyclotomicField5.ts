@@ -21,7 +21,7 @@ export function make(
   return Object.freeze({_0, _1, _2, _3});
 }
 
-function make_(
+export function make_(
   _0: Rational.Rational,
   _1: Rational.Rational,
   _2: Rational.Rational,
@@ -153,7 +153,7 @@ export function conj(value: CyclotomicField5): CyclotomicField5 {
 }
 
 export function toString(value: CyclotomicField5): string {
-  return `${value._0} + ${value._1} zeta + ${value._2} zeta^2 + ${value._3} zeta^3`;
+  return `${Rational.toString(value._0)} + ${Rational.toString(value._1)} zeta + ${Rational.toString(value._2)} zeta^2 + ${Rational.toString(value._3)} zeta^3`;
 }
 
 // Re(zeta) = 1/2 phi^-1 = (sqrt(5) - 1) / 4

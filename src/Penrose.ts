@@ -6,6 +6,8 @@
 import * as CF5 from "./CyclotomicField5.js";
 import * as BBox from "./BBox.js";
 import * as Approx from "./Approx.js";
+export { approxBBox } from "./Approx.js";
+export * as Rational from "./Rational.js";
 
 export class HalfTile {
   public readonly type: HalfTile.Type;
@@ -16,23 +18,23 @@ export class HalfTile {
     this.tri = tri;
   }
 
-  private static parity(type: HalfTile.Type): HalfTile.Parity {
+  static #parity(type: HalfTile.Type): HalfTile.Parity {
     return type & (1 << 0);
   }
 
-  private static shape(type: HalfTile.Type): HalfTile.Shape {
+  static #shape(type: HalfTile.Type): HalfTile.Shape {
     return type & (1 << 1);
   }
 
-  private static orientation(type: HalfTile.Type): HalfTile.Orientation {
+  static #orientation(type: HalfTile.Type): HalfTile.Orientation {
     return type & (1 << 2);
   }
 
-  private static flipOri(value: HalfTile.Orientation): HalfTile.Orientation {
+  static #flipOri(value: HalfTile.Orientation): HalfTile.Orientation {
     return value === HalfTile.Orientation.L ? HalfTile.Orientation.R : HalfTile.Orientation.L;
   }
 
-  private static calculateTri(
+  static #calculateTri(
     ori: HalfTile.Orientation,
     a: CF5.CyclotomicField5,
     b: CF5.CyclotomicField5
@@ -61,23 +63,23 @@ export class HalfTile {
   }
 
   public subdivision(): HalfTile[] {
-    const p = HalfTile.parity(this.type);
-    const s = HalfTile.shape(this.type);
-    const o = HalfTile.orientation(this.type);
+    const p = HalfTile.#parity(this.type);
+    const s = HalfTile.#shape(this.type);
+    const o = HalfTile.#orientation(this.type);
     if (p === HalfTile.Parity.P3 && s === HalfTile.Shape.X) {
-      const d = HalfTile.calculateTri(o, this.tri.a, this.tri.b);
+      const d = HalfTile.#calculateTri(o, this.tri.a, this.tri.b);
       return [
         new HalfTile(
           HalfTile.Parity.P2 | HalfTile.Shape.X | o,
           {a: d, b: this.tri.c, c: this.tri.a},
         ),
         new HalfTile(
-          HalfTile.Parity.P2 | HalfTile.Shape.Y | HalfTile.flipOri(o),
+          HalfTile.Parity.P2 | HalfTile.Shape.Y | HalfTile.#flipOri(o),
           {a: this.tri.b, b: this.tri.a, c: d},
         ),
       ];
     } else if (p === HalfTile.Parity.P2 && s === HalfTile.Shape.Y) {
-      const d = HalfTile.calculateTri(o, this.tri.b, this.tri.c);
+      const d = HalfTile.#calculateTri(o, this.tri.b, this.tri.c);
       return [
         new HalfTile(
           HalfTile.Parity.P3 | HalfTile.Shape.Y | o,
@@ -183,7 +185,7 @@ export class PenroseTree {
     this.root = {value: tile, children: []};
   }
 
-  private follow(path: HalfTile.Type[]): Tree<HalfTile> | undefined {
+  #follow(path: HalfTile.Type[]): Tree<HalfTile> | undefined {
     let node = this.root;
     for (const t of path) {
       const subnode = node.children.find(tile => tile.value.type === t);
@@ -193,11 +195,11 @@ export class PenroseTree {
     return node;
   }
   
-  private static intersect(tree: Tree<HalfTile>, bound: BBox.BBox): [BBox.IntersectionResult, HalfTile.Type[]] {
+  static #intersect(tree: Tree<HalfTile>, bound: BBox.BBox): [BBox.IntersectionResult, HalfTile.Type[]] {
     const res = BBox.intersect(tree.value.tri, bound);
     if (res !== BBox.IntersectionResult.Contain) return [res, []];
     for (const child of tree.children) {
-      const subres = PenroseTree.intersect(child, bound);
+      const subres = PenroseTree.#intersect(child, bound);
       if (subres[0] !== BBox.IntersectionResult.Contain) continue;
       const path = [child.value.type, ...subres[1]];
       return [res, path];
@@ -205,7 +207,7 @@ export class PenroseTree {
     return [res, []];
   }
 
-  private cherrypick(path: HalfTile.Type[], subtree: Tree<HalfTile>) {
+  #cherrypick(path: HalfTile.Type[], subtree: Tree<HalfTile>) {
     if (path.length === 0) {
       this.root = subtree;
       return;
@@ -235,7 +237,7 @@ export class PenroseTree {
     }
   }
 
-  private static refine_(tree: Tree<HalfTile>, depth: number, bound: BBox.BBox) {
+  static #refine_(tree: Tree<HalfTile>, depth: number, bound: BBox.BBox) {
     if (depth === 0) return;
     const res = BBox.intersect(tree.value.tri, bound);
     if (res === BBox.IntersectionResult.Disjoint) {
@@ -246,19 +248,19 @@ export class PenroseTree {
       tree.children = tree.value.subdivision().map(value => ({value, children: []}));
     }
     for (const child of tree.children) {
-      PenroseTree.refine_(child, depth-1, bound);
+      PenroseTree.#refine_(child, depth-1, bound);
     }
   }
 
-  private refine(bound: BBox.BBox) {
-    PenroseTree.refine_(this.root, this.level * 8, bound);
+  #refine(bound: BBox.BBox) {
+    PenroseTree.#refine_(this.root, this.level * 8, bound);
   }
 
   public update(bound: BBox.BBox) {
-    const res = PenroseTree.intersect(this.root, bound);
+    const res = PenroseTree.#intersect(this.root, bound);
     if (res[0] === BBox.IntersectionResult.Disjoint) {
       const tree_ = new PenroseTree(bound);
-      tree_.refine(bound);
+      tree_.#refine(bound);
       this.level = tree_.level;
       this.root = tree_.root;
     } else if (res[0] === BBox.IntersectionResult.Contain) {
@@ -272,24 +274,24 @@ export class PenroseTree {
         path = path.slice(0, i);
       }
       this.level -= path.length / 8;
-      this.root = this.follow(path)!;
-      this.refine(bound);
+      this.root = this.#follow(path)!;
+      this.#refine(bound);
     } else if (res[0] === BBox.IntersectionResult.Intersect) {
-      this.refine(bound);
+      this.#refine(bound);
       const tree_ = new PenroseTree(bound);
-      tree_.refine(bound);
+      tree_.#refine(bound);
 
       const path = Array.from({length:tree_.level - this.level}, _ => HalfTile.paths).flat(1);
-      tree_.cherrypick(path, this.root);
+      tree_.#cherrypick(path, this.root);
       this.level = tree_.level;
       this.root = tree_.root;
     }
   }
   
-  public getTriangles(bound: BBox.BBox, denominator: bigint = BigInt(1e9)): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
+  public getTriangles(bound: BBox.BBox, level = 0, denominator: bigint = BigInt(1e9)): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
     // get leaves
     let nodes = [this.root];
-    for (let level = this.level; level > 0; level--) {
+    for (let l = this.level * 8; l > level; l--) {
       nodes = nodes.flatMap(node => node.children);
     }
     return nodes.map(node => node.value.tri)

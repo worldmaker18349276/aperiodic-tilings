@@ -43,7 +43,11 @@ export function sign(value: GoldenField): -1 | 0 | 1 {
   const b = value._b.numerator * value._a.denominator;
   const a2 = a * a;
   const b2_5 = b * b * 5n;
-  return (a2 > b2_5) === (a > 0n) ? +1 : -1;
+  if (a2 > b2_5) {
+    return a > 0n ? +1 : -1;
+  } else {
+    return b > 0n ? +1 : -1;
+  }
 }
 
 export function add(lhs: GoldenField, rhs: GoldenField): GoldenField {

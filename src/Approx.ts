@@ -159,23 +159,29 @@ export function approxBBox(
   top: Rational.Rational,
   denominator: bigint = BigInt(1e9),
 ): BBox.BBox {
+  const b = div_zeta_imag(bottom, true, denominator);
+  const t = div_zeta_imag(top, false, denominator);
   return BBox.make(
-    CF5.make(left, div_zeta_imag(bottom, true, denominator), Rational.zero, Rational.zero),
-    CF5.make(right, div_zeta_imag(top, false, denominator), Rational.zero, Rational.zero),
+    CF5.make_(
+      left,
+      Rational.mul(b, Rational.make(1n, 2n)),
+      Rational.zero,
+      Rational.zero,
+      Rational.mul(b, Rational.make(-1n, 2n)),
+    ),
+    CF5.make_(
+      right,
+      Rational.mul(t, Rational.make(1n, 2n)),
+      Rational.zero,
+      Rational.zero,
+      Rational.mul(t, Rational.make(-1n, 2n)),
+    ),
   );
 }
 
 function approxGoldenField(value: GF.GoldenField, floor: boolean, denominator: bigint): Rational.Rational {
   return Rational.add(value._a, mul_sqrt5(value._b, floor, denominator));
 }
-
-// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
-const neg_zeta_imag: CF5.CyclotomicField5 = Object.freeze({
-  _0: Rational.make(-1n, 2n),
-  _1: Rational.make(-1n, 1n),
-  _2: Rational.make(-1n, 2n),
-  _3: Rational.make(-1n, 2n),
-});
 
 export type Complex = {readonly re: number, readonly im: number};
 
@@ -190,8 +196,8 @@ export function approxCyclotomicField5(value: CF5.CyclotomicField5, frame: BBox.
   const re_ = approxGoldenField(GF.mul(value_x, GF.inv(width)), true, denominator);
   const re = Rational.approxToNumber(re_);
 
-  const height = CF5.real(CF5.mul(extent, neg_zeta_imag));
-  const value_y = CF5.real(CF5.mul(value_, neg_zeta_imag));
+  const height = CF5.real(CF5.mul(extent, BBox.neg_zeta_imag));
+  const value_y = CF5.real(CF5.mul(value_, BBox.neg_zeta_imag));
   const im_ = approxGoldenField(GF.mul(value_y, GF.inv(height)), true, denominator);
   const im = Rational.approxToNumber(im_);
 

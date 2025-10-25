@@ -4,13 +4,86 @@
   <body style="overflow: hidden;">
     <canvas id="canvas"></canvas>
     <script type="module">
-      // TODO
-    </script>
+      import * as Penrose from "./dist/Penrose.js";
+      window.Penrose = Penrose;
 
-    <script>
+      const scale = 100.0;
+      const range = [0.2, 0.8];
+      const level = 0;
+
       const canvas = document.getElementById("canvas");
-      canvas.setAttribute("width", `${window.innerWidth}`);
-      canvas.setAttribute("height", `${window.innerHeight}`);
+      canvas.setAttribute("width", `${window.innerWidth - 15}`);
+      canvas.setAttribute("height", `${window.innerHeight - 15}`);
+      const ctx = canvas.getContext("2d");
+
+      const bound = Penrose.approxBBox(
+        Penrose.Rational.fromNumber(0.0),
+        Penrose.Rational.fromNumber(0.0),
+        Penrose.Rational.fromNumber(canvas.clientWidth / scale),
+        Penrose.Rational.fromNumber(canvas.clientHeight / scale),
+      );
+      const tree = new Penrose.PenroseTree(bound);
+      tree.update(bound);
+      console.log(`total level: ${tree.level * 8}`);
+      console.log(`current level: ${level}`);
+      const triangles1 = tree.getTriangles(bound, level + 1);
+      const triangles = tree.getTriangles(bound, level);
+
+      function toPixel(x, y) {
+        return [
+          (x * (range[1] - range[0]) + range[0]) * canvas.clientWidth,
+          (y * (range[1] - range[0]) + range[0]) * canvas.clientHeight,
+        ]
+      }
+      function drawTile({a, b, c}, fill="#9cf", stroke="#06c") {
+        ctx.beginPath();
+        ctx.moveTo(...toPixel(a.re, a.im));
+        ctx.lineTo(...toPixel(b.re, b.im));
+        ctx.lineTo(...toPixel(c.re, c.im));
+        ctx.closePath();
+        ctx.fillStyle = fill;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.moveTo(...toPixel(c.re, c.im));
+        ctx.lineTo(...toPixel(a.re, a.im));
+        ctx.lineTo(...toPixel(b.re, b.im));
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+      }
+
+      function drawTriangleDash({a, b, c}, stroke="red") {
+        ctx.beginPath();
+        ctx.setLineDash([5, 10]);
+        ctx.moveTo(...toPixel(c.re, c.im));
+        ctx.lineTo(...toPixel(a.re, a.im));
+        ctx.lineTo(...toPixel(b.re, b.im));
+        ctx.closePath();
+        ctx.strokeStyle = stroke;
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      console.log(`tri: ${triangles.length}`);
+      for (const tri of triangles) {
+        drawTile(tri);
+      }
+      for (const tri of triangles1) {
+        drawTriangleDash(tri);
+      }
+
+      if (range[0] != 0 || range[1] != 1)
+      {
+        ctx.beginPath();
+        ctx.moveTo(...toPixel(0, 0));
+        ctx.lineTo(...toPixel(1, 0));
+        ctx.lineTo(...toPixel(1, 1));
+        ctx.lineTo(...toPixel(0, 1));
+        ctx.closePath();
+        ctx.strokeStyle = "green";
+        ctx.stroke();
+      }
+      
     </script>
   </body>
 </html>

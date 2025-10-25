@@ -25,6 +25,16 @@ export function fromInt(value: number): Rational {
   return Object.freeze({numerator: BigInt(value), denominator: 1n});
 }
 
+export function fromNumber(value: number): Rational {
+  let d = value;
+  let n = 1n;
+  while (!Number.isInteger(d)) {
+    d = d * 2;
+    n = n * 2n;
+  }
+  return make(BigInt(d), n);
+}
+
 export function approxToNumber(value: Rational): number {
   return Number(value.numerator / value.denominator)
     + Number(value.numerator % value.denominator) / Number(value.denominator);

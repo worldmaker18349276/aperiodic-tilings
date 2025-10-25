@@ -26,7 +26,7 @@ export enum IntersectionResult {Disjoint, Intersect, Contain}
 const real = (z: CF5.CyclotomicField5) => CF5.mulCoeff(CF5.add(z, CF5.conj(z)), Rational.make(1n, 2n));
 const imag = (z: CF5.CyclotomicField5) => CF5.mulCoeff(CF5.add(z, CF5.neg(CF5.conj(z))), Rational.make(1n, 2n));
 
-function minGolden(rs: GF.GoldenField[]): GF.GoldenField {
+function minGF(rs: GF.GoldenField[]): GF.GoldenField {
   let r0 = rs[0]!;
   for (const r of rs) {
     if (GF.compare(r0, r) > 0) r0 = r;
@@ -34,7 +34,7 @@ function minGolden(rs: GF.GoldenField[]): GF.GoldenField {
   return r0;
 }
 
-function maxGolden(rs: GF.GoldenField[]): GF.GoldenField {
+function maxGF(rs: GF.GoldenField[]): GF.GoldenField {
   let r0 = rs[0]!;
   for (const r of rs) {
     if (GF.compare(r0, r) < 0) r0 = r;
@@ -42,19 +42,28 @@ function maxGolden(rs: GF.GoldenField[]): GF.GoldenField {
   return r0;
 }
 
+// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
+export const neg_zeta_imag = CF5.make_(
+  Rational.zero,
+  Rational.make(-1n, 2n),
+  Rational.zero,
+  Rational.zero,
+  Rational.make(1n, 2n),
+);
+
 function intersectAlong(
   a: CF5.CyclotomicField5[], b: CF5.CyclotomicField5[],
   x: CF5.CyclotomicField5, y: CF5.CyclotomicField5,
 ): IntersectionResult {
-  const r = CF5.inv(CF5.add(y, CF5.neg(x)));
+  const r = CF5.mul(neg_zeta_imag, CF5.inv(CF5.add(y, CF5.neg(x))));
   const proj = (a: CF5.CyclotomicField5) => CF5.real(CF5.mul(a, r));
   const a_ = a.map(e => proj(e));
   const b_ = b.map(e => proj(e));
   
-  const a_min = minGolden(a_);
-  const a_max = maxGolden(a_);
-  const b_min = minGolden(b_);
-  const b_max = maxGolden(b_);
+  const a_min = minGF(a_);
+  const a_max = maxGF(a_);
+  const b_min = minGF(b_);
+  const b_max = maxGF(b_);
   
   if (GF.compare(b_max, a_min) < 0 || GF.compare(a_max, b_min) < 0) {
     return IntersectionResult.Disjoint;
