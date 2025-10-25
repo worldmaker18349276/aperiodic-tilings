@@ -16,12 +16,16 @@ export class State {
     lastX: 0,
     lastY: 0,
   };
+  #zoom_state = {
+    deltaY: 0.0,
+    when: Date.now(),
+  };
   #canvas: HTMLCanvasElement;
   #ctx: CanvasRenderingContext2D;
   #bound: BBox.BBox;
   #tree: Penrose.PenroseTree;
 
-  #zoom0 = Rational.make(999n, 1000n);
+  #zoom0 = Rational.make(9n, 10n);
   
   constructor(canvas: HTMLCanvasElement, inner_frame: [number, number] = [0.2, 0.8]) {
     this.#inner_frame = inner_frame;
@@ -56,14 +60,25 @@ export class State {
         const lastY = this.#drag_state.lastY;
         this.#drag_state.lastX = e.offsetX;
         this.#drag_state.lastY = e.offsetY;
-        this.move(BigInt(e.offsetX - lastX), BigInt(e.offsetY - lastY));
+        const dx = BigInt(lastX - e.offsetX);
+        const dy = BigInt(lastY - e.offsetY);
+        // console.log(`move ${dx}, ${dy}`);
+        this.move(dx, dy);
       }
     };
     this.#canvas.onwheel = e => {
       e.preventDefault();
-      const n = BigInt(Math.floor(Math.abs(e.deltaY)));
-      let zoom = Rational.make(this.#zoom0.numerator ** n, this.#zoom0.denominator ** n);
+      if (Date.now() - this.#zoom_state.when > 1000.0) this.#zoom_state.deltaY = 0;
+      this.#zoom_state.deltaY += e.deltaY;
+      const deltaY_step = 100;
+      const n = Math.round(this.#zoom_state.deltaY / deltaY_step);
+      this.#zoom_state.deltaY -= n * deltaY_step;
+      this.#zoom_state.when = Date.now();
+      if (n === 0) return;
+      const n_ = BigInt(n);
+      let zoom = Rational.make(this.#zoom0.numerator ** n_, this.#zoom0.denominator ** n_);
       if (e.deltaY > 0) zoom = Rational.inv(zoom);
+      // console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);
       this.zoom(zoom);
     };
   }
@@ -77,14 +92,12 @@ export class State {
   }
 
   zoom(zoom: Rational.Rational) {
-    let denominator = this.#center_denominator * zoom.denominator / zoom.numerator;
+    let denominator = this.#center_denominator * zoom.numerator / zoom.denominator;
     if (denominator === 0n) denominator = 1n;
     this.#center_numerator[0] =
       (denominator * this.#center_numerator[0]) / this.#center_denominator;
     this.#center_numerator[1] =
       (denominator * this.#center_numerator[1]) / this.#center_denominator;
-    this.#pixel_numerator =
-      (denominator * this.#pixel_numerator * zoom.denominator) / (this.#center_denominator * zoom.numerator);
     this.#center_denominator = denominator;
     this.update();
   }
@@ -108,6 +121,7 @@ export class State {
     const ry = Rational.mul(Rational.fromInt(this.#canvas.clientHeight), Rational.mul(length_per_pixel, Rational.make(1n, 2n)));
     const cx = Rational.make(this.#center_numerator[0], this.#center_denominator);
     const cy = Rational.make(this.#center_numerator[1], this.#center_denominator);
+    // console.log(cx, cy, rx, ry);
     this.#bound = Approx.approxBBox(
       Rational.add(cx, Rational.neg(rx)),
       Rational.add(cy, Rational.neg(ry)),
