@@ -16,7 +16,7 @@ export class HalfTile {
     this.tri = tri;
   }
 
-  static #make(type: HalfTile.Type, bc: BBox.Direction, tri: BBox.Triangle): HalfTile {
+  static make(type: HalfTile.Type, bc: BBox.Direction, tri: BBox.Triangle): HalfTile {
     let dir: Readonly<{bc:BBox.Direction, ca:BBox.Direction, ab:BBox.Direction}>;
     {
       const sign = (HalfTile.#orientation(type) === HalfTile.Orientation.L ? +1 : -1);
@@ -80,12 +80,12 @@ export class HalfTile {
     if (p === HalfTile.Parity.P3 && s === HalfTile.Shape.X) {
       const d = HalfTile.#calculateTri(o, this.tri.tri.a, this.tri.tri.b);
       return [
-        HalfTile.#make(
+        HalfTile.make(
           HalfTile.Parity.P2 | HalfTile.Shape.X | o,
           BBox.rotate(this.tri.dir.bc, 2 * o_sign),
           {a: d, b: this.tri.tri.c, c: this.tri.tri.a},
         ),
-        HalfTile.#make(
+        HalfTile.make(
           HalfTile.Parity.P2 | HalfTile.Shape.Y | HalfTile.#flipOri(o),
           BBox.rotate(this.tri.dir.bc, -1 * o_sign),
           {a: this.tri.tri.b, b: this.tri.tri.a, c: d},
@@ -94,12 +94,12 @@ export class HalfTile {
     } else if (p === HalfTile.Parity.P2 && s === HalfTile.Shape.Y) {
       const d = HalfTile.#calculateTri(o, this.tri.tri.b, this.tri.tri.c);
       return [
-        HalfTile.#make(
+        HalfTile.make(
           HalfTile.Parity.P3 | HalfTile.Shape.Y | o,
           BBox.rotate(this.tri.dir.bc, 1 * o_sign),
           {a: this.tri.tri.c, b: d, c: this.tri.tri.b},
         ),
-        HalfTile.#make(
+        HalfTile.make(
           HalfTile.Parity.P3 | HalfTile.Shape.X | o,
           BBox.rotate(this.tri.dir.bc, -1 * o_sign),
           {a: d, b: this.tri.tri.c, c: this.tri.tri.a},
@@ -122,29 +122,6 @@ export class HalfTile {
     } else {
       throw new Error("unreachable");
     }
-  }
-
-  public static init(): [tile:HalfTile, scale:CF5.CyclotomicField5] {
-    // a = |1 + zeta| = sqrt((1 + zeta) (1 + zeta^4))
-    // b = |1 + zeta^2| = sqrt((1 + zeta^3) (1 + zeta^2))
-    // r = b / a = |1 + zeta^2||1 + zeta| / (1 + zeta)(1 + zeta^4) = 1 / (1 + zeta)(1 + zeta^4)
-    // zoom_P3XL_8step = b^2 / a^2 = r^2
-    // shift_P3XL_8step = r zeta^4 + r^2 zeta^2
-    // center_P3XL = shift_P3XL_8step + zoom_P3XL_8step * center_P3XL
-    const z = CF5.zeta;
-    const z2 = CF5.mul(z, z);
-    const z3 = CF5.mul(z2, z);
-    const z4 = CF5.mul(z2, z2);
-    const r = CF5.inv(CF5.mul(CF5.add(CF5.one, z), CF5.add(CF5.one, z4)));
-    const r2 = CF5.mul(r, r);
-    const zoom_P3XL_8step = r2;
-    const shift_P3XL_8step = CF5.add(CF5.mul(r, z4), CF5.mul(r2, z2));
-    const center_P3XL = CF5.mul(shift_P3XL_8step, CF5.inv(CF5.add(CF5.one, CF5.neg(zoom_P3XL_8step))));
-    
-    const a = CF5.neg(center_P3XL);
-    const b = CF5.add(z3, CF5.neg(center_P3XL));
-    const c = CF5.add(CF5.neg(z2), CF5.neg(center_P3XL));
-    return [HalfTile.#make(HalfTile.Type.P3XL, 0, Object.freeze({a, b, c})), zoom_P3XL_8step];
   }
 }
 
@@ -182,24 +159,61 @@ export class PenroseTree {
   public level: number;
   public root: Tree<HalfTile>;
 
+  static #spine = (() => {
+    // a = |1 + zeta| = sqrt((1 + zeta) (1 + zeta^4))
+    // b = |1 + zeta^2| = sqrt((1 + zeta^3) (1 + zeta^2))
+    // r = b / a = |1 + zeta^2||1 + zeta| / (1 + zeta)(1 + zeta^4) = 1 / (1 + zeta)(1 + zeta^4)
+    // zoom_P3XL_8step = b^2 / a^2 = r^2
+    // shift_P3XL_8step = r zeta^4 + r^2 zeta^2
+    // center_P3XL = shift_P3XL_8step + zoom_P3XL_8step * center_P3XL
+
+    const z = CF5.zeta;
+    const z2 = CF5.mul(z, z);
+    const z3 = CF5.mul(z2, z);
+    const z4 = CF5.mul(z2, z2);
+    const r = CF5.inv(CF5.mul(CF5.add(CF5.one, z), CF5.add(CF5.one, z4)));
+    const r2 = CF5.mul(r, r);
+    const zoom_P3XL_8step = r2;
+    const shift_P3XL_8step = CF5.add(CF5.mul(r, z4), CF5.mul(r2, z2));
+    const center_P3XL = CF5.mul(shift_P3XL_8step, CF5.inv(CF5.add(CF5.one, CF5.neg(zoom_P3XL_8step))));
+
+    const tile = HalfTile.make(
+      HalfTile.Type.P3XL,
+      0 as BBox.Direction,
+      Object.freeze({a: CF5.zero, b: z3, c: CF5.neg(z2)}),
+    );
+    const scale = CF5.inv(zoom_P3XL_8step);
+    const offset = CF5.mul(center_P3XL, CF5.add(CF5.one, CF5.neg(scale)));
+    
+    return { tiles: [tile], offset, scale };
+  })();
+  
+  static #getSpineTile(level: number): HalfTile {
+    if (PenroseTree.#spine.tiles[level] === undefined) {
+      for (let l = PenroseTree.#spine.tiles.length; l <= level; l++) {
+        const prev = PenroseTree.#spine.tiles[l-1]!;
+        const tri = Object.freeze({
+            a: CF5.add(CF5.mul(prev.tri.tri.a, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+            b: CF5.add(CF5.mul(prev.tri.tri.b, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+            c: CF5.add(CF5.mul(prev.tri.tri.c, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+          });
+
+        PenroseTree.#spine.tiles.push(
+          new HalfTile(PenroseTree.#spine.tiles[0]!.type, BBox.makeTriangle(tri, prev.tri.dir))
+        );
+      }
+    }
+    return PenroseTree.#spine.tiles[level]!;
+  }
+
   public constructor(bound: BBox.BBox) {
     const bound_cached = BBox.makeCached(bound);
-    const [tile0, zoom_P3XL] = HalfTile.init();
-    const scale0 = CF5.inv(zoom_P3XL);
     let level = 0;
-    let tri = tile0.tri;
-    while (BBox.intersectCached(tri, bound_cached) !== BBox.IntersectionResult.Contain) {
+    let tile = PenroseTree.#getSpineTile(level);
+    while (BBox.intersectCached(tile.tri, bound_cached) !== BBox.IntersectionResult.Contain) {
       level += 1;
-      tri = BBox.makeTriangle(
-        Object.freeze({
-          a: CF5.mul(tri.tri.a, scale0),
-          b: CF5.mul(tri.tri.b, scale0),
-          c: CF5.mul(tri.tri.c, scale0),
-        }),
-        tri.dir,
-      );
+      tile = PenroseTree.#getSpineTile(level);
     }
-    const tile = new HalfTile(tile0.type, tri);
     this.level = level;
     this.root = {value: tile, children: []};
   }
