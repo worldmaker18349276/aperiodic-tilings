@@ -8,10 +8,12 @@ import * as BBox from "./BBox.js";
 import * as Approx from "./Approx.js";
 
 export class HalfTile {
+  public state: HalfTile.State;
   public readonly type: HalfTile.Type;
   public readonly tri: BBox.TriangleCached;
 
   public constructor(type: HalfTile.Type, tri: BBox.TriangleCached) {
+    this.state = HalfTile.State.Empty;
     this.type = type;
     this.tri = tri;
   }
@@ -126,6 +128,7 @@ export class HalfTile {
 }
 
 export namespace HalfTile {
+  export enum State {Full, Partial, Empty}
   export enum Parity {P2 = 0, P3 = 1 << 0}
   // X: flat triangle, a is top, bc is bottom
   // Y: tall triangle, a is top, bc is bottom
@@ -182,8 +185,8 @@ export class PenroseTree {
       0 as BBox.Direction,
       Object.freeze({a: CF5.zero, b: z3, c: CF5.neg(z2)}),
     );
-    const scale = CF5.inv(zoom_P3XL_8step);
-    const offset = CF5.mul(center_P3XL, CF5.add(CF5.one, CF5.neg(scale)));
+    const scale = CF5.inv(zoom_P3XL_8step); // = 2 - 3 zeta^2 - 3 zeta^-2 = 2 + 3 phi = 6.8541
+    const offset = CF5.mul(center_P3XL, CF5.add(CF5.one, CF5.neg(scale))); // = zeta - zeta^-1 = 1.1756 i
     
     return { tiles: [tile], offset, scale };
   })();
@@ -218,7 +221,32 @@ export class PenroseTree {
     this.root = {value: tile, children: []};
   }
 
-  #follow(path: HalfTile.Type[]): Tree<HalfTile> | undefined {
+  // intersect tree and given bound,
+  // if it is Contain, find the subtree that just contains this bound.
+  static #intersect(tree: Tree<HalfTile>, bound: BBox.BBoxCached): [BBox.IntersectionResult, HalfTile.Type[]] {
+    const res = BBox.intersectCached(tree.value.tri, bound);
+
+    const path: HalfTile.Type[] = [];
+    if (res === BBox.IntersectionResult.Contain) {
+      let node = tree;
+      while (true) {
+        let found = false;
+        for (const child of node.children) {
+          const subres = BBox.intersectCached(child.value.tri, bound);
+          if (subres === BBox.IntersectionResult.Contain) {
+            path.push(child.value.type);
+            node = child;
+            found = true;
+            break;
+          }
+        }
+        if (!found) break;
+      }
+    }
+    return [res, path];
+  }
+
+  #getSubtree(path: HalfTile.Type[]): Tree<HalfTile> | undefined {
     let node = this.root;
     for (const t of path) {
       const subnode = node.children.find(tile => tile.value.type === t);
@@ -228,25 +256,15 @@ export class PenroseTree {
     return node;
   }
   
-  static #intersect(tree: Tree<HalfTile>, bound: BBox.BBoxCached): [BBox.IntersectionResult, HalfTile.Type[]] {
-    const res = BBox.intersectCached(tree.value.tri, bound);
-    if (res !== BBox.IntersectionResult.Contain) return [res, []];
-    for (const child of tree.children) {
-      const subres = PenroseTree.#intersect(child, bound);
-      if (subres[0] !== BBox.IntersectionResult.Contain) continue;
-      const path = [child.value.type, ...subres[1]];
-      return [res, path];
-    }
-    return [res, []];
-  }
-
-  #cherrypick(path: HalfTile.Type[], subtree: Tree<HalfTile>) {
+  // subdivide along the path if no children
+  #setSubtree(path: HalfTile.Type[], subtree: Tree<HalfTile>) {
     if (path.length === 0) {
       this.root = subtree;
       return;
     }
+    let parent = this.root;
     let node = this.root;
-    for (const t of path.slice(0, path.length-1)) {
+    for (const t of path) {
       if (node.children.length === 0) {
         node.children = node.value.subdivision().map(value => ({value, children: []}));
       }
@@ -254,50 +272,70 @@ export class PenroseTree {
       if (subnode === undefined) {
         throw new Error("invalid path");
       }
+      parent = node;
       node = subnode;
     }
-    {
-      const t = path[path.length-1]!;
-      if (node.children.length === 0) {
-        node.children = node.value.subdivision().map(value => ({value, children: []}));
-      }
-      const subnode = node.children.find(child => child.value.type === t);
-      if (subnode === undefined) {
-        throw new Error("invalid path");
-      }
-      const i = node.children.indexOf(subnode);
-      node.children[i] = subtree;
-    }
+    parent.children[parent.children.indexOf(node)] = subtree;
   }
 
   #refine(bound: BBox.BBoxCached) {
-    const stack = [[this.root, this.level * 8] as const];
+    type Stack = [node:Tree<HalfTile>, depth:number, is_contained:boolean];
+    const stack = [[this.root, this.level * 8, false] as Stack];
     while (stack.length > 0) {
-      const [tree, depth] = stack.pop()!;
-      if (depth === 0) continue;
-      const res = BBox.intersectCached(tree.value.tri, bound);
-      if (res === BBox.IntersectionResult.Disjoint) {
-        tree.children = [];
+      const [node, depth, is_contained] = stack.pop()!;
+      const res = is_contained ? BBox.IntersectionResult.BeContained : BBox.intersectCached(node.value.tri, bound);
+
+      if (depth === 0) {
+        node.value.state =
+          res === BBox.IntersectionResult.Disjoint ?
+            HalfTile.State.Empty
+          : res === BBox.IntersectionResult.BeContained ?
+            HalfTile.State.Full
+          : 
+            HalfTile.State.Partial;
         continue;
       }
-      if (tree.children.length === 0) {
-        tree.children = tree.value.subdivision().map(value => ({value, children: []}));
+
+      if (res === BBox.IntersectionResult.Disjoint) {
+        // trim this subtree
+        node.value.state = HalfTile.State.Empty;
+        node.children = [];
+        continue;
       }
-      for (const child of tree.children) {
-        stack.push([child, depth-1]);
+
+      if (res === BBox.IntersectionResult.BeContained && node.value.state === HalfTile.State.Full) {
+        // already done
+        continue;
+      }
+
+      // subdivide if absent
+      if (node.children.length === 0) {
+        node.value.state = res === BBox.IntersectionResult.BeContained ? HalfTile.State.Full : HalfTile.State.Partial;
+        node.children = node.value.subdivision().map(value => ({value, children: []}));
+      }
+
+      for (const child of node.children) {
+        stack.push([child, depth-1, res === BBox.IntersectionResult.BeContained]);
       }
     }
   }
 
   public update(bound: BBox.BBox) {
     const bound_cached = BBox.makeCached(bound);
+
     const res = PenroseTree.#intersect(this.root, bound_cached);
-    if (res[0] === BBox.IntersectionResult.Disjoint) {
+    switch (res[0]) {
+    case BBox.IntersectionResult.Disjoint:
+    {
+      // rebuild the whole tree
       const tree_ = new PenroseTree(bound);
-      tree_.#refine(bound_cached);
       this.level = tree_.level;
       this.root = tree_.root;
-    } else if (res[0] === BBox.IntersectionResult.Contain) {
+    }
+    break;
+    case BBox.IntersectionResult.Contain:
+    {
+      // shorten the tree
       let path = res[1];
       {
         let i = 0;
@@ -308,18 +346,25 @@ export class PenroseTree {
         path = path.slice(0, i);
       }
       this.level -= path.length / 8;
-      this.root = this.#follow(path)!;
-      this.#refine(bound_cached);
-    } else if (res[0] === BBox.IntersectionResult.Intersect) {
-      this.#refine(bound_cached);
+      this.root = this.#getSubtree(path)!;
+    }
+    break;
+    case BBox.IntersectionResult.Intersect:
+    case BBox.IntersectionResult.BeContained:
+    {
+      // lengthen the tree
       const tree_ = new PenroseTree(bound);
-      tree_.#refine(bound_cached);
-
       const path = Array.from({length:tree_.level - this.level}, _ => HalfTile.paths).flat(1);
-      tree_.#cherrypick(path, this.root);
+      tree_.#setSubtree(path, this.root);
       this.level = tree_.level;
       this.root = tree_.root;
     }
+    break;
+    default:
+      throw new Error("unreachable");
+    }
+
+    this.#refine(bound_cached);
   }
   
   public getTriangles(bound: BBox.BBox, level = 0, denominator: bigint = BigInt(1e9)): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
@@ -328,7 +373,9 @@ export class PenroseTree {
     for (let l = this.level * 8; l > level; l--) {
       nodes = nodes.flatMap(node => node.children);
     }
-    return nodes.map(node => node.value.tri.tri)
+    return nodes
+      .filter(node => node.value.state !== HalfTile.State.Empty)
+      .map(node => node.value.tri.tri)
       .map(({a, b, c}) => {
         return {
           a: Approx.approxCyclotomicField5(a, bound, denominator),

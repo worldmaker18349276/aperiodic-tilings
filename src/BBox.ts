@@ -65,7 +65,7 @@ export function makeCached(bbox: BBox): BBoxCached {
   return { bbox, bbox_projected };
 }
 
-export function projectBBox(bbox: BBoxCached, dir: Direction): Projected {
+function projectBBox(bbox: BBoxCached, dir: Direction): Projected {
   return bbox.bbox_projected[dir]!;
 }
 
@@ -100,7 +100,7 @@ export function makeTriangle(
   return { tri, dir, tri_projected: [] };
 }
 
-export function projectTriangle(tri: TriangleCached, dir: Direction): Projected {
+function projectTriangle(tri: TriangleCached, dir: Direction): Projected {
   if (tri.tri_projected[dir] === undefined) {
     tri.tri_projected[dir] = project([tri.tri.a, tri.tri.b, tri.tri.c], dir);
   }
@@ -108,13 +108,15 @@ export function projectTriangle(tri: TriangleCached, dir: Direction): Projected 
 }
 
 
-export enum IntersectionResult {Disjoint, Intersect, Contain}
+export enum IntersectionResult {Disjoint, Intersect, Contain, BeContained}
 
 function intersectProjected(a: Projected, b: Projected): IntersectionResult {
   if (GF.compare(b.max, a.min) < 0 || GF.compare(a.max, b.min) < 0) {
     return IntersectionResult.Disjoint;
   } else if (GF.compare(a.min, b.min) < 0 && GF.compare(b.max, a.max) < 0) {
     return IntersectionResult.Contain;
+  } else if (GF.compare(b.min, a.min) < 0 && GF.compare(a.max, b.max) < 0) {
+    return IntersectionResult.BeContained;
   } else {
     return IntersectionResult.Intersect;
   }
@@ -123,13 +125,15 @@ function intersectProjected(a: Projected, b: Projected): IntersectionResult {
 export function intersectCached(tri: TriangleCached, bbox: BBoxCached): IntersectionResult {
   const tri_dirs = [tri.dir.bc, tri.dir.ca, tri.dir.ab];
 
-  let is_all_contain = true;  
+  let contain = true;
+  let be_contained = true;
   for (const d of tri_dirs) {
     const res = intersectProjected(projectTriangle(tri, d), projectBBox(bbox, d));
     if (res === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
-    is_all_contain = is_all_contain && res === IntersectionResult.Contain;
+    contain = contain && res === IntersectionResult.Contain;
+    if (d === 0) be_contained = be_contained && res === IntersectionResult.BeContained;
   }
-  if (is_all_contain) return IntersectionResult.Contain;
+  if (contain) return IntersectionResult.Contain;
 
   const bbox_dirs = [5 as Direction];
   if (!tri_dirs.includes(0)) bbox_dirs.push(0);
@@ -137,7 +141,9 @@ export function intersectCached(tri: TriangleCached, bbox: BBoxCached): Intersec
   for (const d of bbox_dirs) {
     const res = intersectProjected(projectTriangle(tri, d), projectBBox(bbox, d));
     if (res === IntersectionResult.Disjoint) return IntersectionResult.Disjoint;
+    be_contained = be_contained && res === IntersectionResult.BeContained;
   }
+  if (be_contained) return IntersectionResult.BeContained;
 
   return IntersectionResult.Intersect;
 }
