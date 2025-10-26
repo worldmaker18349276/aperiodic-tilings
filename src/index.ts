@@ -7,7 +7,7 @@ type Triangle = {a: Approx.Complex, b: Approx.Complex, c: Approx.Complex};
 
 export class State {
   #draw_level: number = 0;
-  #inner_frame: [number, number];
+  #margin: number;
   #center_numerator: [bigint, bigint] = [0n, 0n];
   #center_denominator: bigint = 200000n;
   #pixel_numerator = 2000n;
@@ -29,8 +29,8 @@ export class State {
 
   #zoom0 = Rational.make(19n, 20n);
   
-  constructor(canvas: HTMLCanvasElement, inner_frame: [number, number] = [0.2, 0.8]) {
-    this.#inner_frame = inner_frame;
+  constructor(canvas: HTMLCanvasElement, margin = 0.2) {
+    this.#margin = margin;
     this.#canvas = canvas;
     this.#ctx = canvas.getContext("2d")!;
 
@@ -140,7 +140,7 @@ export class State {
       this.#drawTile(tri);
     }
 
-    if (this.#inner_frame[0] !== 0.0 || this.#inner_frame[1] !== 1.0) {
+    if (this.#margin !== 0.0) {
       const triangles_parent = this.#tree.getTriangles(this.#bound, this.#draw_level + 1);
       for (const tri of triangles_parent) {
         this.#drawTriangleDash(tri);
@@ -159,8 +159,8 @@ export class State {
 
   #toPixel(x: number, y: number): [number, number] {
     return [
-      (x * (this.#inner_frame[1] - this.#inner_frame[0]) + this.#inner_frame[0]) * this.#canvas.clientWidth,
-      (y * (this.#inner_frame[1] - this.#inner_frame[0]) + this.#inner_frame[0]) * this.#canvas.clientHeight,
+      (x * (1 - this.#margin * 2) + this.#margin) * this.#canvas.clientWidth,
+      (y * (1 - this.#margin * 2) + this.#margin) * this.#canvas.clientHeight,
     ]
   }
 
