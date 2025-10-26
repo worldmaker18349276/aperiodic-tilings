@@ -9,11 +9,23 @@ import * as Approx from "./Approx.js";
 
 export class HalfTile {
   public readonly type: HalfTile.Type;
-  public readonly tri: BBox.Triangle;
+  public readonly tri: BBox.TriangleCached;
 
-  public constructor(type: HalfTile.Type, tri: BBox.Triangle) {
+  public constructor(type: HalfTile.Type, tri: BBox.TriangleCached) {
     this.type = type;
     this.tri = tri;
+  }
+
+  static #make(type: HalfTile.Type, bc: BBox.Direction, tri: BBox.Triangle): HalfTile {
+    let dir: Readonly<{bc:BBox.Direction, ca:BBox.Direction, ab:BBox.Direction}>;
+    {
+      const sign = (HalfTile.#orientation(type) === HalfTile.Orientation.L ? +1 : -1);
+      const n = HalfTile.#shape(type) === HalfTile.Shape.X ? 2 : -1;
+      let ca = BBox.rotate(bc, n * sign);
+      let ab = BBox.rotate(bc, -n * sign);
+      dir = Object.freeze({bc, ca, ab});
+    }
+    return new HalfTile(type, BBox.makeTriangle(tri, dir));
   }
 
   static #parity(type: HalfTile.Type): HalfTile.Parity {
@@ -64,28 +76,33 @@ export class HalfTile {
     const p = HalfTile.#parity(this.type);
     const s = HalfTile.#shape(this.type);
     const o = HalfTile.#orientation(this.type);
+    const o_sign = o === HalfTile.Orientation.L ? +1 : -1;
     if (p === HalfTile.Parity.P3 && s === HalfTile.Shape.X) {
-      const d = HalfTile.#calculateTri(o, this.tri.a, this.tri.b);
+      const d = HalfTile.#calculateTri(o, this.tri.tri.a, this.tri.tri.b);
       return [
-        new HalfTile(
+        HalfTile.#make(
           HalfTile.Parity.P2 | HalfTile.Shape.X | o,
-          {a: d, b: this.tri.c, c: this.tri.a},
+          BBox.rotate(this.tri.dir.bc, 2 * o_sign),
+          {a: d, b: this.tri.tri.c, c: this.tri.tri.a},
         ),
-        new HalfTile(
+        HalfTile.#make(
           HalfTile.Parity.P2 | HalfTile.Shape.Y | HalfTile.#flipOri(o),
-          {a: this.tri.b, b: this.tri.a, c: d},
+          BBox.rotate(this.tri.dir.bc, -1 * o_sign),
+          {a: this.tri.tri.b, b: this.tri.tri.a, c: d},
         ),
       ];
     } else if (p === HalfTile.Parity.P2 && s === HalfTile.Shape.Y) {
-      const d = HalfTile.#calculateTri(o, this.tri.b, this.tri.c);
+      const d = HalfTile.#calculateTri(o, this.tri.tri.b, this.tri.tri.c);
       return [
-        new HalfTile(
+        HalfTile.#make(
           HalfTile.Parity.P3 | HalfTile.Shape.Y | o,
-          {a: this.tri.c, b: d, c: this.tri.b},
+          BBox.rotate(this.tri.dir.bc, 1 * o_sign),
+          {a: this.tri.tri.c, b: d, c: this.tri.tri.b},
         ),
-        new HalfTile(
+        HalfTile.#make(
           HalfTile.Parity.P3 | HalfTile.Shape.X | o,
-          {a: d, b: this.tri.c, c: this.tri.a},
+          BBox.rotate(this.tri.dir.bc, -1 * o_sign),
+          {a: d, b: this.tri.tri.c, c: this.tri.tri.a},
         ),
       ];
     } else if (p === HalfTile.Parity.P3) {
@@ -127,7 +144,7 @@ export class HalfTile {
     const a = CF5.neg(center_P3XL);
     const b = CF5.add(z3, CF5.neg(center_P3XL));
     const c = CF5.add(CF5.neg(z2), CF5.neg(center_P3XL));
-    return [new HalfTile(HalfTile.Type.P3XL, Object.freeze({a, b, c})), zoom_P3XL_8step];
+    return [HalfTile.#make(HalfTile.Type.P3XL, 0, Object.freeze({a, b, c})), zoom_P3XL_8step];
   }
 }
 
@@ -166,17 +183,21 @@ export class PenroseTree {
   public root: Tree<HalfTile>;
 
   public constructor(bound: BBox.BBox) {
+    const bound_cached = BBox.makeCached(bound);
     const [tile0, zoom_P3XL] = HalfTile.init();
     const scale0 = CF5.inv(zoom_P3XL);
     let level = 0;
     let tri = tile0.tri;
-    while (BBox.intersect(tri, bound) !== BBox.IntersectionResult.Contain) {
+    while (BBox.intersectCached(tri, bound_cached) !== BBox.IntersectionResult.Contain) {
       level += 1;
-      tri = Object.freeze({
-        a: CF5.mul(tri.a, scale0),
-        b: CF5.mul(tri.b, scale0),
-        c: CF5.mul(tri.c, scale0),
-      });
+      tri = BBox.makeTriangle(
+        Object.freeze({
+          a: CF5.mul(tri.tri.a, scale0),
+          b: CF5.mul(tri.tri.b, scale0),
+          c: CF5.mul(tri.tri.c, scale0),
+        }),
+        tri.dir,
+      );
     }
     const tile = new HalfTile(tile0.type, tri);
     this.level = level;
@@ -193,8 +214,8 @@ export class PenroseTree {
     return node;
   }
   
-  static #intersect(tree: Tree<HalfTile>, bound: BBox.BBox): [BBox.IntersectionResult, HalfTile.Type[]] {
-    const res = BBox.intersect(tree.value.tri, bound);
+  static #intersect(tree: Tree<HalfTile>, bound: BBox.BBoxCached): [BBox.IntersectionResult, HalfTile.Type[]] {
+    const res = BBox.intersectCached(tree.value.tri, bound);
     if (res !== BBox.IntersectionResult.Contain) return [res, []];
     for (const child of tree.children) {
       const subres = PenroseTree.#intersect(child, bound);
@@ -235,12 +256,12 @@ export class PenroseTree {
     }
   }
 
-  #refine(bound: BBox.BBox) {
+  #refine(bound: BBox.BBoxCached) {
     const stack = [[this.root, this.level * 8] as const];
     while (stack.length > 0) {
       const [tree, depth] = stack.pop()!;
       if (depth === 0) continue;
-      const res = BBox.intersect(tree.value.tri, bound);
+      const res = BBox.intersectCached(tree.value.tri, bound);
       if (res === BBox.IntersectionResult.Disjoint) {
         tree.children = [];
         continue;
@@ -255,10 +276,11 @@ export class PenroseTree {
   }
 
   public update(bound: BBox.BBox) {
-    const res = PenroseTree.#intersect(this.root, bound);
+    const bound_cached = BBox.makeCached(bound);
+    const res = PenroseTree.#intersect(this.root, bound_cached);
     if (res[0] === BBox.IntersectionResult.Disjoint) {
       const tree_ = new PenroseTree(bound);
-      tree_.#refine(bound);
+      tree_.#refine(bound_cached);
       this.level = tree_.level;
       this.root = tree_.root;
     } else if (res[0] === BBox.IntersectionResult.Contain) {
@@ -273,11 +295,11 @@ export class PenroseTree {
       }
       this.level -= path.length / 8;
       this.root = this.#follow(path)!;
-      this.#refine(bound);
+      this.#refine(bound_cached);
     } else if (res[0] === BBox.IntersectionResult.Intersect) {
-      this.#refine(bound);
+      this.#refine(bound_cached);
       const tree_ = new PenroseTree(bound);
-      tree_.#refine(bound);
+      tree_.#refine(bound_cached);
 
       const path = Array.from({length:tree_.level - this.level}, _ => HalfTile.paths).flat(1);
       tree_.#cherrypick(path, this.root);
@@ -292,7 +314,7 @@ export class PenroseTree {
     for (let l = this.level * 8; l > level; l--) {
       nodes = nodes.flatMap(node => node.children);
     }
-    return nodes.map(node => node.value.tri)
+    return nodes.map(node => node.value.tri.tri)
       .map(({a, b, c}) => {
         return {
           a: Approx.approxCyclotomicField5(a, bound, denominator),

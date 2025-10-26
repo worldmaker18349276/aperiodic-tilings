@@ -196,8 +196,8 @@ export function approxCyclotomicField5(value: CF5.CyclotomicField5, frame: BBox.
   const re_ = approxGoldenField(GF.mul(value_x, GF.inv(width)), true, denominator);
   const re = Rational.approxToNumber(re_);
 
-  const height = CF5.real(CF5.mul(extent, BBox.neg_zeta_imag));
-  const value_y = CF5.real(CF5.mul(value_, BBox.neg_zeta_imag));
+  const height = CF5.real(CF5.mul(extent, CF5.neg_zeta_imag));
+  const value_y = CF5.real(CF5.mul(value_, CF5.neg_zeta_imag));
   const im_ = approxGoldenField(GF.mul(value_y, GF.inv(height)), true, denominator);
   const im = Rational.approxToNumber(im_);
 

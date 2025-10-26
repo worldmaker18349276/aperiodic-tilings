@@ -42,6 +42,19 @@ export const zero = make(Rational.zero, Rational.zero, Rational.zero, Rational.z
 export const one = make(Rational.one, Rational.zero, Rational.zero, Rational.zero);
 
 export const zeta = make(Rational.zero, Rational.one, Rational.zero, Rational.zero);
+export const zeta2 = make(Rational.zero, Rational.zero, Rational.one, Rational.zero);
+export const zeta3 = make(Rational.zero, Rational.zero, Rational.zero, Rational.one);
+export const zeta4 = make_(Rational.zero, Rational.zero, Rational.zero, Rational.zero, Rational.one);
+
+// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
+export const neg_zeta_imag = make_(
+  Rational.zero,
+  Rational.make(-1n, 2n),
+  Rational.zero,
+  Rational.zero,
+  Rational.make(1n, 2n),
+);
+
 
 export function eq(lhs: CyclotomicField5, rhs: CyclotomicField5): boolean {
   return Rational.eq(lhs._0, rhs._0)
