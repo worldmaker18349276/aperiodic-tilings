@@ -70,6 +70,14 @@ export function approxToNumber(value: Rational): number {
     + Number(value.numerator % value.denominator) / Number(value.denominator);
 }
 
+export function roundTo(value: Rational, denominator: bigint, floor: boolean): Rational {
+  const n = abs(value.numerator) * denominator;
+  const s = sign(value.numerator);
+  if (s === -1n) floor = !floor;
+  const numerator = s * (n / value.denominator + (!floor && n % value.denominator !== 0n ? 1n : 0n));
+  return make(numerator, denominator);
+}
+
 export function eq(lhs: Rational, rhs: Rational): boolean {
   return lhs.numerator === rhs.numerator && lhs.denominator === rhs.denominator;
 }

@@ -5,7 +5,6 @@
 
 import * as CF5 from "./CyclotomicField5.js";
 import * as BBox from "./BBox.js";
-import * as Approx from "./Approx.js";
 
 export class HalfTile {
   public state: HalfTile.State;
@@ -19,15 +18,11 @@ export class HalfTile {
   }
 
   static make(type: HalfTile.Type, bc: BBox.Direction, tri: BBox.Triangle): HalfTile {
-    let dir: Readonly<{bc:BBox.Direction, ca:BBox.Direction, ab:BBox.Direction}>;
-    {
-      const sign = (HalfTile.#orientation(type) === HalfTile.Orientation.L ? +1 : -1);
-      const n = HalfTile.#shape(type) === HalfTile.Shape.X ? 2 : -1;
-      let ca = BBox.rotate(bc, n * sign);
-      let ab = BBox.rotate(bc, -n * sign);
-      dir = Object.freeze({bc, ca, ab});
-    }
-    return new HalfTile(type, BBox.makeTriangle(tri, dir));
+    const sign = (HalfTile.#orientation(type) === HalfTile.Orientation.L ? +1 : -1);
+    const n = HalfTile.#shape(type) === HalfTile.Shape.X ? 2 : -1;
+    let ca = BBox.rotate(bc, n * sign);
+    let ab = BBox.rotate(bc, -n * sign);
+    return new HalfTile(type, BBox.makeTriangle(tri, {bc, ca, ab}));
   }
 
   static #parity(type: HalfTile.Type): HalfTile.Parity {
@@ -53,22 +48,20 @@ export class HalfTile {
   ): CF5.CyclotomicField5 {
     if (ori === HalfTile.Orientation.L) {
       // b + (b - a) * zeta^2
-      const z2 = CF5.mul(CF5.zeta, CF5.zeta);
       return CF5.add(
         b,
         CF5.mul(
           CF5.add(b, CF5.neg(a)),
-          z2,
+          CF5.zeta2,
         )
       );
     } else {
       // b + (b - a) * zeta^3
-      const z3 = CF5.mul(CF5.zeta, CF5.mul(CF5.zeta, CF5.zeta));
       return CF5.add(
         b,
         CF5.mul(
           CF5.add(b, CF5.neg(a)),
-          z3,
+          CF5.zeta3,
         )
       );
     }
@@ -128,7 +121,7 @@ export class HalfTile {
 }
 
 export namespace HalfTile {
-  export enum State {Full, Partial, Empty}
+  export enum State {Empty, Partial, Full}
   export enum Parity {P2 = 0, P3 = 1 << 0}
   // X: flat triangle, a is top, bc is bottom
   // Y: tall triangle, a is top, bc is bottom
@@ -169,25 +162,22 @@ export class PenroseTree {
     // zoom_P3XL_8step = b^2 / a^2 = r^2
     // shift_P3XL_8step = r zeta^4 + r^2 zeta^2
     // center_P3XL = shift_P3XL_8step + zoom_P3XL_8step * center_P3XL
+    
+    // spine_tile0 = {0, zeta^3, -zeta^2}
+    // spine_tile -> parent_spine_tile: p -> p * scale + offset
+    // scale = zoom_P3XL_8step^-1 = 2 - 3 zeta^2 - 3 zeta^-2 = 6.8541
+    // offset = -center_P3XL * zoom_P3XL_8step^-1 + center_P3XL = zeta - zeta^-1 = 1.1756 i
 
-    const z = CF5.zeta;
-    const z2 = CF5.mul(z, z);
-    const z3 = CF5.mul(z2, z);
-    const z4 = CF5.mul(z2, z2);
-    const r = CF5.inv(CF5.mul(CF5.add(CF5.one, z), CF5.add(CF5.one, z4)));
-    const r2 = CF5.mul(r, r);
-    const zoom_P3XL_8step = r2;
-    const shift_P3XL_8step = CF5.add(CF5.mul(r, z4), CF5.mul(r2, z2));
-    const center_P3XL = CF5.mul(shift_P3XL_8step, CF5.inv(CF5.add(CF5.one, CF5.neg(zoom_P3XL_8step))));
-
+    const a = CF5.zero;
+    const b = CF5.mul(CF5.mul(CF5.zeta, CF5.zeta), CF5.zeta);
+    const c = CF5.neg(CF5.mul(CF5.zeta, CF5.zeta));
     const tile = HalfTile.make(
       HalfTile.Type.P3XL,
       0 as BBox.Direction,
-      Object.freeze({a: CF5.zero, b: z3, c: CF5.neg(z2)}),
+      {a, b, c},
     );
-    const scale = CF5.inv(zoom_P3XL_8step); // = 2 - 3 zeta^2 - 3 zeta^-2 = 2 + 3 phi = 6.8541
-    const offset = CF5.mul(center_P3XL, CF5.add(CF5.one, CF5.neg(scale))); // = zeta - zeta^-1 = 1.1756 i
-    
+    const scale = CF5.make(2n, 0n, -3n, -3n);
+    const offset = CF5.make_(0n, 1n, 0n, 0n, -1n);
     return { tiles: [tile], offset, scale };
   })();
   
@@ -195,11 +185,11 @@ export class PenroseTree {
     if (PenroseTree.#spine.tiles[level] === undefined) {
       for (let l = PenroseTree.#spine.tiles.length; l <= level; l++) {
         const prev = PenroseTree.#spine.tiles[l-1]!;
-        const tri = Object.freeze({
-            a: CF5.add(CF5.mul(prev.tri.tri.a, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
-            b: CF5.add(CF5.mul(prev.tri.tri.b, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
-            c: CF5.add(CF5.mul(prev.tri.tri.c, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
-          });
+        const tri = {
+          a: CF5.add(CF5.mul(prev.tri.tri.a, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+          b: CF5.add(CF5.mul(prev.tri.tri.b, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+          c: CF5.add(CF5.mul(prev.tri.tri.c, PenroseTree.#spine.scale), PenroseTree.#spine.offset),
+        };
 
         PenroseTree.#spine.tiles.push(
           new HalfTile(PenroseTree.#spine.tiles[0]!.type, BBox.makeTriangle(tri, prev.tri.dir))
@@ -209,7 +199,7 @@ export class PenroseTree {
     return PenroseTree.#spine.tiles[level]!;
   }
 
-  public constructor(bound: BBox.BBox) {
+  public constructor(bound: BBox.BBoxRational) {
     const bound_cached = BBox.makeCached(bound);
     let level = 0;
     let tile = PenroseTree.#getSpineTile(level);
@@ -320,7 +310,7 @@ export class PenroseTree {
     }
   }
 
-  public update(bound: BBox.BBox) {
+  public update(bound: BBox.BBoxRational) {
     const bound_cached = BBox.makeCached(bound);
 
     const res = PenroseTree.#intersect(this.root, bound_cached);
@@ -367,7 +357,7 @@ export class PenroseTree {
     this.#refine(bound_cached);
   }
   
-  public getTriangles(bound: BBox.BBox, level = 0, denominator: bigint = BigInt(1e9)): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
+  public getTriangles(level = 0): BBox.TriangleCached[] {
     // get leaves
     let nodes = [this.root];
     for (let l = this.level * 8; l > level; l--) {
@@ -375,13 +365,6 @@ export class PenroseTree {
     }
     return nodes
       .filter(node => node.value.state !== HalfTile.State.Empty)
-      .map(node => node.value.tri.tri)
-      .map(({a, b, c}) => {
-        return {
-          a: Approx.approxCyclotomicField5(a, bound, denominator),
-          b: Approx.approxCyclotomicField5(b, bound, denominator),
-          c: Approx.approxCyclotomicField5(c, bound, denominator),
-        };
-      });
+      .map(node => node.value.tri);
   }
 }

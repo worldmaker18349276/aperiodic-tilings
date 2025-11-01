@@ -8,9 +8,11 @@ type Triangle = {a: Approx.Complex, b: Approx.Complex, c: Approx.Complex};
 export class State {
   #draw_level: number = 0;
   #margin: number;
-  #center_numerator: [bigint, bigint] = [0n, 0n];
-  #center_denominator: bigint = 200000n;
-  #pixel_numerator = 2000n;
+  #center: [Rational.Rational, Rational.Rational] = [Rational.zero, Rational.zero];
+  #view_width: Rational.Rational = Rational.make(10n, 1n);
+  #unit: Rational.Rational = Rational.one;
+  #precision_per_pixel: bigint = 128n;
+
   #drag_state = {
     dragging: false,
     lastX: 0,
@@ -21,33 +23,72 @@ export class State {
     deltaY_step: 50,
     zoom_delay: 1000,
     when: Date.now(),
+    rate: Rational.make(19n, 20n),
   };
   #canvas: HTMLCanvasElement;
   #ctx: CanvasRenderingContext2D;
-  #bound: BBox.BBox;
+
   #tree: Penrose.PenroseTree;
 
-  #zoom0 = Rational.make(19n, 20n);
+  getWidth(): bigint {
+    return BigInt(this.#canvas.clientWidth);
+  }
+
+  getHeight(): bigint {
+    return BigInt(this.#canvas.clientHeight);
+  }
+
+  #updateUnit() {
+    const width_pixel = this.getWidth();
+    const unit = Rational.mul(this.#view_width, Rational.make(1n, this.#precision_per_pixel * width_pixel));
+    const unit_i = Rational.integer(unit);
+    if (unit_i >= 1n)
+      this.#unit = Rational.make(unit_i, 1n);
+    else
+      this.#unit = Rational.make(1n, Rational.integer(Rational.inv(unit)) + 1n);
+  }
   
-  constructor(canvas: HTMLCanvasElement, margin = 0.2) {
+  #approx(r: Rational.Rational): Rational.Rational {
+    const unit_inv = Rational.inv(this.#unit);
+    return Rational.mul(this.#unit, Rational.make(Rational.integer(Rational.mul(r, unit_inv)), 1n));
+  }
+  
+  getCenter(): [Rational.Rational, Rational.Rational] {
+    return [this.#approx(this.#center[0]), this.#approx(this.#center[1])];
+  }
+  
+  getBound(): BBox.BBoxRational {
+    const half_view_width = Rational.mul(this.#view_width, Rational.make(1n, 2n));
+    const half_view_height = Rational.mul(
+      this.#view_width,
+      Rational.make(this.getHeight(), 2n * this.getWidth()),
+    );
+    const bl = [
+      Rational.add(this.#center[0], Rational.neg(half_view_width)),
+      Rational.add(this.#center[1], Rational.neg(half_view_height)),
+    ] as const;
+    const tr = [
+      Rational.add(this.#center[0], half_view_width),
+      Rational.add(this.#center[1], half_view_height),
+    ] as const;
+    const unit_inv = Rational.inv(this.#unit);
+    const l = Rational.integer(Rational.mul(bl[0], unit_inv));
+    const b = Rational.integer(Rational.mul(bl[1], unit_inv));
+    const r = Rational.integer(Rational.mul(tr[0], unit_inv)) + 1n;
+    const t = Rational.integer(Rational.mul(tr[1], unit_inv)) + 1n;
+    return Approx.approxBBox(l, b, r, t, this.#unit);
+  }
+  
+  constructor(canvas: HTMLCanvasElement, margin=0.0) {
     this.#margin = margin;
     this.#canvas = canvas;
     this.#ctx = canvas.getContext("2d")!;
 
-    const length_per_pixel = Rational.make(this.#pixel_numerator, this.#center_denominator);
-    const rx = Rational.mul(Rational.fromInt(this.#canvas.clientWidth), Rational.mul(length_per_pixel, Rational.make(1n, 2n)));
-    const ry = Rational.mul(Rational.fromInt(this.#canvas.clientHeight), Rational.mul(length_per_pixel, Rational.make(1n, 2n)));
-    const cx = Rational.make(this.#center_numerator[0], this.#center_denominator);
-    const cy = Rational.make(this.#center_numerator[1], this.#center_denominator);
-    this.#bound = Approx.approxBBox(
-      Rational.add(cx, Rational.neg(rx)),
-      Rational.add(cy, Rational.neg(ry)),
-      Rational.add(cx, rx),
-      Rational.add(cy, ry),
-    );
-    this.#tree = new Penrose.PenroseTree(this.#bound);
-    this.#tree.update(this.#bound);
-    this.#draw();
+    this.#updateUnit();
+    const bound = this.getBound();
+    this.#tree = new Penrose.PenroseTree(bound);
+    this.#tree.update(bound);
+    this.#draw(bound);
 
     this.#canvas.onmousedown = e => {
       this.#drag_state.dragging = true;
@@ -64,7 +105,7 @@ export class State {
         this.#drag_state.lastY = e.offsetY;
         const dx = BigInt(lastX - e.offsetX);
         const dy = BigInt(lastY - e.offsetY);
-        // console.log(`move ${dx}, ${dy}`);
+        console.log(`move ${dx}, ${dy}`);
         this.move(dx, dy);
       }
     };
@@ -77,75 +118,88 @@ export class State {
       this.#zoom_state.when = Date.now();
       if (n === 0) return;
       const n_ = BigInt(n > 0n ? n : -n);
-      let zoom = Rational.make(this.#zoom0.numerator ** n_, this.#zoom0.denominator ** n_);
+      let zoom = Rational.make(this.#zoom_state.rate.numerator ** n_, this.#zoom_state.rate.denominator ** n_);
       if (e.deltaY > 0) zoom = Rational.inv(zoom);
-      // console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);
+      console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);
       this.zoom(zoom);
     };
   }
   
   move(dx_pixel: bigint, dy_pixel: bigint) {
-    const dx = dx_pixel * this.#pixel_numerator;
-    const dy = dy_pixel * this.#pixel_numerator;
-    this.#center_numerator[0] += dx;
-    this.#center_numerator[1] += dy;
+    const pixel = Rational.mul(this.#view_width, Rational.make(1n, this.getWidth()));
+    const dx = this.#approx(Rational.mul(Rational.make(dx_pixel, 1n), pixel));
+    const dy = this.#approx(Rational.mul(Rational.make(dy_pixel, 1n), pixel));
+    const center = this.getCenter();
+    this.#center = [
+      Rational.add(center[0], dx),
+      Rational.add(center[1], dy),
+    ];
     this.update();
   }
 
   zoom(zoom: Rational.Rational) {
-    let denominator = this.#center_denominator * zoom.numerator / zoom.denominator;
-    if (denominator === 0n) denominator = 1n;
-    this.#center_numerator[0] =
-      (denominator * this.#center_numerator[0]) / this.#center_denominator;
-    this.#center_numerator[1] =
-      (denominator * this.#center_numerator[1]) / this.#center_denominator;
-    this.#center_denominator = denominator;
+    this.#view_width = Rational.mul(this.#view_width, Rational.inv(zoom));
+    this.#updateUnit();
     this.update();
   }
-  
-  // scale(): string {
-  // }
-  // center_x(): string {
-  // }
-  // center_y(): string {
-  // }
-  // set(scale: string | undefined, x: string | undefined, y: string | undefined) {
-  //   this.#length_per_pixel = scale === undefined ? this.#length_per_pixel : Rational.parseRationalExpr(scale);
-  //   this.#center[0] = x === undefined ? this.#center[0] : Rational.parseRationalExpr(x);
-  //   this.#center[1] = y === undefined ? this.#center[1] : Rational.parseRationalExpr(y);
-  //   this.update();
-  // }
-  
+
   update() {
-    const length_per_pixel = Rational.make(this.#pixel_numerator, this.#center_denominator);
-    const rx = Rational.mul(Rational.fromInt(this.#canvas.clientWidth), Rational.mul(length_per_pixel, Rational.make(1n, 2n)));
-    const ry = Rational.mul(Rational.fromInt(this.#canvas.clientHeight), Rational.mul(length_per_pixel, Rational.make(1n, 2n)));
-    const cx = Rational.make(this.#center_numerator[0], this.#center_denominator);
-    const cy = Rational.make(this.#center_numerator[1], this.#center_denominator);
-    // console.log(cx, cy, rx, ry);
-    this.#bound = Approx.approxBBox(
-      Rational.add(cx, Rational.neg(rx)),
-      Rational.add(cy, Rational.neg(ry)),
-      Rational.add(cx, rx),
-      Rational.add(cy, ry),
-    );
-    this.#tree.update(this.#bound);
-    this.#draw();
+    const bound = this.getBound();
+    this.#tree.update(bound);
+    this.#draw(bound);
+  }
+
+  static #approxTriangles(triangles: BBox.TriangleCached[], bound: BBox.BBoxRational): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
+    return triangles
+      .map(tri => tri.tri)
+      .map(({a, b, c}) => {
+        return {
+          a: Approx.approxCyclotomicField5(a, bound),
+          b: Approx.approxCyclotomicField5(b, bound),
+          c: Approx.approxCyclotomicField5(c, bound),
+        };
+      });
   }
   
-  #draw() {
-    const triangles = this.#tree.getTriangles(this.#bound, this.#draw_level);
+  #draw(bound: BBox.BBoxRational) {
+    const triangles = State.#approxTriangles(this.#tree.getTriangles(this.#draw_level), bound);
     this.#ctx.clearRect(0, 0, this.#canvas.clientWidth, this.#canvas.clientHeight);
-    for (const tri of triangles) {
-      this.#drawTile(tri);
+    for (const {a, b, c} of triangles) {
+      // fill triangles
+      this.#ctx.beginPath();
+      this.#ctx.moveTo(...this.#toPixel(a.re, a.im));
+      this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
+      this.#ctx.lineTo(...this.#toPixel(c.re, c.im));
+      this.#ctx.closePath();
+      this.#ctx.fillStyle = "#9cf";
+      this.#ctx.fill();
+
+      // draw tile borders
+      this.#ctx.beginPath();
+      this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
+      this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
+      this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
+      this.#ctx.strokeStyle = "#06c";
+      this.#ctx.stroke();
     }
 
     if (this.#margin !== 0.0) {
-      const triangles_parent = this.#tree.getTriangles(this.#bound, this.#draw_level + 1);
-      for (const tri of triangles_parent) {
-        this.#drawTriangleDash(tri);
+      // draw previous level
+      const triangles_parent = State.#approxTriangles(this.#tree.getTriangles(this.#draw_level + 1), bound);
+      for (const {a, b, c} of triangles_parent) {
+        // draw parent tile borders as dashed lines
+        this.#ctx.beginPath();
+        this.#ctx.setLineDash([5, 10]);
+        this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
+        this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
+        this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
+        this.#ctx.closePath();
+        this.#ctx.strokeStyle = "red";
+        this.#ctx.stroke();
+        this.#ctx.setLineDash([]);
       }
 
+      // draw boundary as green lines
       this.#ctx.beginPath();
       this.#ctx.moveTo(...this.#toPixel(0, 0));
       this.#ctx.lineTo(...this.#toPixel(1, 0));
@@ -162,35 +216,6 @@ export class State {
       (x * (1 - this.#margin * 2) + this.#margin) * this.#canvas.clientWidth,
       (y * (1 - this.#margin * 2) + this.#margin) * this.#canvas.clientHeight,
     ]
-  }
-
-  #drawTile({a, b, c}: Triangle, fill="#9cf", stroke="#06c") {
-    this.#ctx.beginPath();
-    this.#ctx.moveTo(...this.#toPixel(a.re, a.im));
-    this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
-    this.#ctx.lineTo(...this.#toPixel(c.re, c.im));
-    this.#ctx.closePath();
-    this.#ctx.fillStyle = fill;
-    this.#ctx.fill();
-
-    this.#ctx.beginPath();
-    this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
-    this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
-    this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
-    this.#ctx.strokeStyle = stroke;
-    this.#ctx.stroke();
-  }
-
-  #drawTriangleDash({a, b, c}: Triangle, stroke="red") {
-    this.#ctx.beginPath();
-    this.#ctx.setLineDash([5, 10]);
-    this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
-    this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
-    this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
-    this.#ctx.closePath();
-    this.#ctx.strokeStyle = stroke;
-    this.#ctx.stroke();
-    this.#ctx.setLineDash([]);
   }
 }
 

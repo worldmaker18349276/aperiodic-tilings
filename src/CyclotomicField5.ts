@@ -2,157 +2,102 @@
 /// its real part is gold field.
 /// note that its multiplication and reciprocal are complicated to compute.
 
-import * as Rational from "./Rational.js";
-import * as GoldenField from "./GoldenField.js";
+import * as GF from "./GoldenField.js";
 
-export type CyclotomicField5 = {
-  readonly _0: Rational.Rational,
-  readonly _1: Rational.Rational,
-  readonly _2: Rational.Rational,
-  readonly _3: Rational.Rational,
-};
+export type CyclotomicField5 = Readonly<{
+  _0: bigint,
+  _1: bigint,
+  _2: bigint,
+  _3: bigint,
+}>;
 
-export function make(
-  _0: Rational.Rational,
-  _1: Rational.Rational,
-  _2: Rational.Rational,
-  _3: Rational.Rational,
-): CyclotomicField5 {
+export type CyclotomicField5Rational = Readonly<{numerator: CyclotomicField5, denominator: bigint}>;
+
+export function make(_0: bigint, _1: bigint, _2: bigint, _3: bigint): CyclotomicField5 {
   return Object.freeze({_0, _1, _2, _3});
 }
 
-export function make_(
-  _0: Rational.Rational,
-  _1: Rational.Rational,
-  _2: Rational.Rational,
-  _3: Rational.Rational,
-  _4: Rational.Rational,
-): CyclotomicField5 {
-  const neg_4 = Rational.neg(_4);
-  return make(
-    Rational.add(_0, neg_4),
-    Rational.add(_1, neg_4),
-    Rational.add(_2, neg_4),
-    Rational.add(_3, neg_4),
-  );
+export function make_(_0: bigint, _1: bigint, _2: bigint, _3: bigint, _4: bigint): CyclotomicField5 {
+  return make(_0 - _4, _1 - _4, _2 - _4, _3 - _4);
 }
 
-export const zero = make(Rational.zero, Rational.zero, Rational.zero, Rational.zero);
+export function makeRational(numerator: CyclotomicField5, denominator: bigint): CyclotomicField5Rational {
+  return Object.freeze({numerator, denominator});
+}
 
-export const one = make(Rational.one, Rational.zero, Rational.zero, Rational.zero);
+export const zero = make(0n, 0n, 0n, 0n);
+export const one = make(1n, 0n, 0n, 0n);
+export const zeta = make(0n, 1n, 0n, 0n);
+export const zeta2 = make(0n, 0n, 1n, 0n);
+export const zeta3 = make(0n, 0n, 0n, 1n);
+export const zeta4 = make_(0n, 0n, 0n, 0n, 1n);
 
-export const zeta = make(Rational.zero, Rational.one, Rational.zero, Rational.zero);
-export const zeta2 = make(Rational.zero, Rational.zero, Rational.one, Rational.zero);
-export const zeta3 = make(Rational.zero, Rational.zero, Rational.zero, Rational.one);
-export const zeta4 = make_(Rational.zero, Rational.zero, Rational.zero, Rational.zero, Rational.one);
-
-// -Im(zeta) i = -i/2 sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/8) i = -0.9510 i
-export const neg_zeta_imag = make_(
-  Rational.zero,
-  Rational.make(-1n, 2n),
-  Rational.zero,
-  Rational.zero,
-  Rational.make(1n, 2n),
-);
+// -2 Im(zeta) i = -i sqrt(phi sqrt(5)) = -sqrt((5 + sqrt(5))/2) i = -1.9020 i
+export const neg_2_zeta_imag = make_(0n, -1n, 0n, 0n, 1n);
 
 
 export function eq(lhs: CyclotomicField5, rhs: CyclotomicField5): boolean {
-  return Rational.eq(lhs._0, rhs._0)
-    && Rational.eq(lhs._1, rhs._1)
-    && Rational.eq(lhs._2, rhs._2)
-    && Rational.eq(lhs._3, rhs._3);
+  return lhs._0 === rhs._0
+    && lhs._1 === rhs._1
+    && lhs._2 === rhs._2
+    && lhs._3 === rhs._3;
 }
 
 export function add(lhs: CyclotomicField5, rhs: CyclotomicField5): CyclotomicField5 {
   return make(
-    Rational.add(lhs._0, rhs._0),
-    Rational.add(lhs._1, rhs._1),
-    Rational.add(lhs._2, rhs._2),
-    Rational.add(lhs._3, rhs._3),
+    lhs._0 + rhs._0,
+    lhs._1 + rhs._1,
+    lhs._2 + rhs._2,
+    lhs._3 + rhs._3,
   );
 }
 
 export function neg(val: CyclotomicField5): CyclotomicField5 {
   return make(
-    Rational.neg(val._0),
-    Rational.neg(val._1),
-    Rational.neg(val._2),
-    Rational.neg(val._3),
+    -val._0,
+    -val._1,
+    -val._2,
+    -val._3,
   );
 }
 
 export function mul(lhs: CyclotomicField5, rhs: CyclotomicField5): CyclotomicField5 {
   return make_(
-    [
-      Rational.mul(lhs._0, rhs._0),
-      Rational.mul(lhs._2, rhs._3),
-      Rational.mul(lhs._3, rhs._2),
-    ].reduce(Rational.add),
-    [
-      Rational.mul(lhs._0, rhs._1),
-      Rational.mul(lhs._1, rhs._0),
-      Rational.mul(lhs._3, rhs._3),
-    ].reduce(Rational.add),
-    [
-      Rational.mul(lhs._0, rhs._2),
-      Rational.mul(lhs._1, rhs._1),
-      Rational.mul(lhs._2, rhs._0),
-    ].reduce(Rational.add),
-    [
-      Rational.mul(lhs._0, rhs._3),
-      Rational.mul(lhs._1, rhs._2),
-      Rational.mul(lhs._2, rhs._1),
-      Rational.mul(lhs._3, rhs._0),
-    ].reduce(Rational.add),
-    [
-      Rational.mul(lhs._1, rhs._3),
-      Rational.mul(lhs._2, rhs._2),
-      Rational.mul(lhs._3, rhs._1)
-    ].reduce(Rational.add),
+    lhs._0 * rhs._0                   + lhs._2 * rhs._3 + lhs._3 * rhs._2,
+    lhs._0 * rhs._1 + lhs._1 * rhs._0                   + lhs._3 * rhs._3,
+    lhs._0 * rhs._2 + lhs._1 * rhs._1 + lhs._2 * rhs._0,
+    lhs._0 * rhs._3 + lhs._1 * rhs._2 + lhs._2 * rhs._1 + lhs._3 * rhs._0,
+                      lhs._1 * rhs._3 + lhs._2 * rhs._2 + lhs._3 * rhs._1,
   );
 }
 
-export function mulCoeff(lhs: CyclotomicField5, rhs: Rational.Rational): CyclotomicField5 {
+export function mulCoeff(lhs: CyclotomicField5, rhs: bigint): CyclotomicField5 {
   return make(
-    Rational.mul(lhs._0, rhs),
-    Rational.mul(lhs._1, rhs),
-    Rational.mul(lhs._2, rhs),
-    Rational.mul(lhs._3, rhs),
+    lhs._0 * rhs,
+    lhs._1 * rhs,
+    lhs._2 * rhs,
+    lhs._3 * rhs,
   );
 }
 
-export function inv(value: CyclotomicField5): CyclotomicField5 {
-  const c1 = make_(
-    value._0,
-    value._3,
-    value._1,
-    Rational.zero,
-    value._2,
-  );
-  const c2 = make_(
-    value._0,
-    value._2,
-    Rational.zero,
-    value._1,
-    value._3,
-  );
-  const c3 = make_(
-    value._0,
-    Rational.zero,
-    value._3,
-    value._2,
-    value._1,
-  );
+export function inv(value: CyclotomicField5Rational): CyclotomicField5Rational {
+  if (eq(value.numerator, zero)) throw new Error(`inverse of 0/1`);
+  const c0 = value.numerator;
+  const c1 = make_(c0._0, c0._3, c0._1,    0n, c0._2);
+  const c2 = make_(c0._0, c0._2,    0n, c0._1, c0._3);
+  const c3 = make_(c0._0,    0n, c0._3, c0._2, c0._1);
   const conj_value = mul(mul(c1, c2), c3);
 
-  const norm = mul(value, conj_value);
-  return mulCoeff(conj_value, Rational.inv(norm._0));
+  const norm = mul(c0, conj_value)._0;
+  const denominator = norm > 0n ? norm : -norm;
+  const numerator = mulCoeff(conj_value, norm > 0n ? value.denominator : -value.denominator);
+  return makeRational(numerator, denominator);
 }
 
 export function conj(value: CyclotomicField5): CyclotomicField5 {
   return make_(
     value._0,
-    Rational.zero,
+    0n,
     value._3,
     value._2,
     value._1,
@@ -160,30 +105,32 @@ export function conj(value: CyclotomicField5): CyclotomicField5 {
 }
 
 export function toString(value: CyclotomicField5): string {
-  return `${Rational.toString(value._0)} + ${Rational.toString(value._1)} zeta + ${Rational.toString(value._2)} zeta^2 + ${Rational.toString(value._3)} zeta^3`;
+  return `${value._0} + ${value._1} zeta + ${value._2} zeta^2 + ${value._3} zeta^3`;
 }
 
-// Re(zeta) = 1/2 phi^-1 = (sqrt(5) - 1) / 4
-const zeta_real: GoldenField.GoldenField = Object.freeze({
-  _a: Rational.make(-1n, 4n),
-  _b: Rational.make(1n, 4n),
-});
+// 4 Re(zeta) = 2 phi^-1 = sqrt(5) - 1
+const zeta_real_4: GF.GoldenField = GF.make(-1n, 1n);
 
-// Re(zeta^2) = -1/2 phi = (-sqrt(5) - 1) / 4
-const zeta2_real: GoldenField.GoldenField = Object.freeze({
-  _a: Rational.make(-1n, 4n),
-  _b: Rational.make(-1n, 4n),
-});
+// 4 Re(zeta^2) = -2 phi = -sqrt(5) - 1
+const zeta2_real_4: GF.GoldenField = GF.make(-1n, -1n);
 
-export function real(value: CyclotomicField5): GoldenField.GoldenField {
-  let _a = value._0;
-  let _b = Rational.zero;
-  _a = Rational.add(_a, Rational.mul(value._1, zeta_real._a));
-  _b = Rational.add(_b, Rational.mul(value._1, zeta_real._b));
-  _a = Rational.add(_a, Rational.mul(value._2, zeta2_real._a));
-  _b = Rational.add(_b, Rational.mul(value._2, zeta2_real._b));
-  _a = Rational.add(_a, Rational.mul(value._3, zeta2_real._a));
-  _b = Rational.add(_b, Rational.mul(value._3, zeta2_real._b));
-  return GoldenField.make(_a, _b);
+export function real(value: CyclotomicField5): GF.GoldenFieldRational {
+  let _a = value._0 * 4n;
+  let _b = 0n;
+  _a += value._1 * zeta_real_4._a;
+  _b += value._1 * zeta_real_4._b;
+  _a += value._2 * zeta2_real_4._a;
+  _b += value._2 * zeta2_real_4._b;
+  _a += value._3 * zeta2_real_4._a;
+  _b += value._3 * zeta2_real_4._b;
+  return GF.makeRational(GF.make(_a, _b), 4n);
 }
 
+// return 2 Re[z], 2 Im[z]
+export function real_imag_2(z: CyclotomicField5): [CyclotomicField5, CyclotomicField5] {
+  const z_ = conj(z);
+  return [
+    add(z, z_),
+    add(z, neg(z_)),
+  ];
+}

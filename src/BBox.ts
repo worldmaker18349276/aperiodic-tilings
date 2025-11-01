@@ -4,7 +4,6 @@
 
 import * as CF5 from "./CyclotomicField5.js";
 import * as GF from "./GoldenField.js";
-import * as Rational from "./Rational.js";
 
 
 // direction of line: 0 ~ 4 => zeta^n; 5 => i
@@ -15,52 +14,53 @@ export function rotate(d: Direction, n: number): Direction {
 }
 
 // perpendicular direction of Direction
-const axes = [CF5.one, CF5.zeta, CF5.zeta2, CF5.zeta3, CF5.zeta4, CF5.neg_zeta_imag]
-  .map(z => CF5.mul(CF5.neg_zeta_imag, CF5.inv(z)));
+const axes = [CF5.one, CF5.zeta4, CF5.zeta3, CF5.zeta2, CF5.zeta]
+  .map(z => CF5.mul(CF5.neg_2_zeta_imag, z))
+  .concat([CF5.one]);
 
-const half = Rational.make(1n, 2n);
-function real_imag(z: CF5.CyclotomicField5): [CF5.CyclotomicField5, CF5.CyclotomicField5] {
-  const z_ = CF5.conj(z);
-  return [
-    CF5.mulCoeff(CF5.add(z, z_), half),
-    CF5.mulCoeff(CF5.add(z, CF5.neg(z_)), half),
-  ];
+export type Projected = Readonly<{min: GF.GoldenFieldRational, max: GF.GoldenFieldRational}>;
+
+function project(points: CF5.CyclotomicField5[], denominator: bigint, direction: Direction): Projected {
+  const points_num = points.map(p => CF5.real(CF5.mul(p, axes[direction]!)));
+  // points_num.every(v => v.denominator === 4n);
+
+  const min_num = points_num.reduce((lhs, rhs) => GF.compare(lhs.numerator, rhs.numerator) > 0 ? rhs : lhs);
+  const max_num = points_num.reduce((lhs, rhs) => GF.compare(lhs.numerator, rhs.numerator) > 0 ? lhs : rhs);
+  const min = GF.makeRational(min_num.numerator, min_num.denominator * denominator);
+  const max = GF.makeRational(max_num.numerator, max_num.denominator * denominator);
+
+  return Object.freeze({min, max});
 }
 
-export type Projected = Readonly<{min: GF.GoldenField, max: GF.GoldenField}>;
+export type BBox = Readonly<{
+  bl: CF5.CyclotomicField5,
+  tr: CF5.CyclotomicField5,
+}>;
 
-function project(points: CF5.CyclotomicField5[], direction: Direction): Projected {
-  const points_ = points.map(p => CF5.real(CF5.mul(p, axes[direction]!)));
-  return Object.freeze({
-    min: points_.reduce((lhs, rhs) => GF.compare(lhs, rhs) > 0 ? rhs : lhs),
-    max: points_.reduce((lhs, rhs) => GF.compare(lhs, rhs) > 0 ? lhs : rhs),
-  });
-}
-
-export type BBox = {
-  readonly bl: CF5.CyclotomicField5,
-  readonly tr: CF5.CyclotomicField5,
-};
+export type BBoxRational = Readonly<{
+  numerator: BBox,
+  denominator: bigint,
+}>;
 
 export type BBoxCached = {
-  bbox: BBox,
+  bbox: BBoxRational,
   bbox_projected: Projected[],
 };
 
-export function make(bl: CF5.CyclotomicField5, tr: CF5.CyclotomicField5): BBox {
-  return Object.freeze({bl, tr});
+export function make(bl: CF5.CyclotomicField5, tr: CF5.CyclotomicField5, denominator: bigint): BBoxRational {
+  return Object.freeze({numerator: Object.freeze({bl, tr}), denominator});
 }
 
-export function makeCached(bbox: BBox): BBoxCached {
-  const bl = bbox.bl;
-  const tr = bbox.tr;
-  const [bl_real, bl_imag] = real_imag(bbox.bl);
-  const [tr_real, tr_imag] = real_imag(bbox.tr);
+export function makeCached(bbox: BBoxRational): BBoxCached {
+  const bl = CF5.mulCoeff(bbox.numerator.bl, 2n);
+  const tr = CF5.mulCoeff(bbox.numerator.tr, 2n);
+  const [bl_real, bl_imag] = CF5.real_imag_2(bbox.numerator.bl);
+  const [tr_real, tr_imag] = CF5.real_imag_2(bbox.numerator.tr);
   const br = CF5.add(bl_imag, tr_real);
   const tl = CF5.add(tr_imag, bl_real);
 
   const bbox_projected = ([0, 1, 2, 3, 4, 5] as Direction[])
-    .map(d => project([bl, br, tr, tl], d));
+    .map(d => project([bl, br, tr, tl], 2n * bbox.denominator, d));
   
   return { bbox, bbox_projected };
 }
@@ -70,11 +70,11 @@ function projectBBox(bbox: BBoxCached, dir: Direction): Projected {
 }
 
 
-export type Triangle = {
-  readonly a: CF5.CyclotomicField5,
-  readonly b: CF5.CyclotomicField5,
-  readonly c: CF5.CyclotomicField5,
-};
+export type Triangle = Readonly<{
+  a: CF5.CyclotomicField5,
+  b: CF5.CyclotomicField5,
+  c: CF5.CyclotomicField5,
+}>;
 
 export type TriangleCached = {
   tri: Triangle,
@@ -88,21 +88,23 @@ function assert(cond: () => boolean) {
 
 export function makeTriangle(
   tri: Triangle,
-  dir: Readonly<{bc: Direction, ca: Direction, ab: Direction}>,
+  dir: {bc: Direction, ca: Direction, ab: Direction},
 ): TriangleCached {
   assert(() => {
-    const bc = project([CF5.add(tri.c, CF5.neg(tri.b))], dir.bc).min;
-    const ca = project([CF5.add(tri.a, CF5.neg(tri.c))], dir.ca).min;
-    const ab = project([CF5.add(tri.b, CF5.neg(tri.a))], dir.ab).min;
+    const bc = project([CF5.add(tri.c, CF5.neg(tri.b))], 1n, dir.bc).min.numerator;
+    const ca = project([CF5.add(tri.a, CF5.neg(tri.c))], 1n, dir.ca).min.numerator;
+    const ab = project([CF5.add(tri.b, CF5.neg(tri.a))], 1n, dir.ab).min.numerator;
     return [bc, ca, ab].every(e => GF.eq(e, GF.zero));
   });
 
+  tri = Object.freeze({a: tri.a, b: tri.b, c: tri.c});
+  dir = Object.freeze({bc: dir.bc, ca: dir.ca, ab: dir.ab});
   return { tri, dir, tri_projected: [] };
 }
 
 function projectTriangle(tri: TriangleCached, dir: Direction): Projected {
   if (tri.tri_projected[dir] === undefined) {
-    tri.tri_projected[dir] = project([tri.tri.a, tri.tri.b, tri.tri.c], dir);
+    tri.tri_projected[dir] = project([tri.tri.a, tri.tri.b, tri.tri.c], 1n, dir);
   }
   return tri.tri_projected[dir];
 }
@@ -111,11 +113,11 @@ function projectTriangle(tri: TriangleCached, dir: Direction): Projected {
 export enum IntersectionResult {Disjoint, Intersect, Contain, BeContained}
 
 function intersectProjected(a: Projected, b: Projected): IntersectionResult {
-  if (GF.compare(b.max, a.min) < 0 || GF.compare(a.max, b.min) < 0) {
+  if (GF.compareRational(b.max, a.min) < 0 || GF.compareRational(a.max, b.min) < 0) {
     return IntersectionResult.Disjoint;
-  } else if (GF.compare(a.min, b.min) < 0 && GF.compare(b.max, a.max) < 0) {
+  } else if (GF.compareRational(a.min, b.min) < 0 && GF.compareRational(b.max, a.max) < 0) {
     return IntersectionResult.Contain;
-  } else if (GF.compare(b.min, a.min) < 0 && GF.compare(a.max, b.max) < 0) {
+  } else if (GF.compareRational(b.min, a.min) < 0 && GF.compareRational(a.max, b.max) < 0) {
     return IntersectionResult.BeContained;
   } else {
     return IntersectionResult.Intersect;

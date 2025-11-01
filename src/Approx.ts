@@ -52,24 +52,14 @@ function solve(f: (x: bigint) => bigint, x0: bigint, x1: bigint, floor: boolean)
 }
 
 // approximate sqrt(value)
-function sqrt(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational | undefined {
-  if (value.numerator < 0n) return;
+function sqrt(value: bigint, floor: boolean): bigint | undefined {
+  if (value < 0n) return undefined;
 
   // x^2 - r = 0
-  // let n/d = x, a/b = r
-  // solve f(n) = b n^2 - a d^2
+  // solve f(x) = x^2 - r = 0
 
-  const sqrt_num = Rational.approxToNumber(value);
-
-  let n = BigInt(Math.floor(sqrt_num * Number(denominator)));
-  let d = denominator;
-  
-  const a = value.numerator;
-  const b = value.denominator;
-  const _ad2 = a * d ** 2n;
-  n = solve(n => b * n ** 2n - _ad2, n, n + 1n, floor);
-  
-  return Rational.make(n, d);
+  const x0 = BigInt(Math.ceil(Math.sqrt(Number(value))));
+  return solve(x => x ** 2n - value, x0, x0 + 1n, floor);
 }
 
 // sqrt(5) ceiling approximation
@@ -79,127 +69,90 @@ const sqrt5_approx = Rational.make(
 );
 
 // approximate value * sqrt(5)
-function mul_sqrt5(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
-  if (value.numerator < 0n) {
-    return Rational.neg(mul_sqrt5(Rational.neg(value), !floor, denominator));
+function mul_sqrt5(value: bigint, floor: boolean): bigint {
+  if (value < 0n) {
+    return -mul_sqrt5(-value, !floor);
   }
 
   // sqrt(5) r - x = 0
   // 5 r^2 - x^2 = 0
-  // let n/d = x, a/b = r^2
-  // solve f(n) = b n^2 - 5 a d^2
+  // solve f(x) = x^2 - 5 r^2 = 0
 
-  let n = value.numerator * sqrt5_approx.numerator;
-  let d = value.denominator * sqrt5_approx.denominator;
-  while (d < denominator) {
-    n *= 2n;
-    d *= 2n;
-  }
-  
-  const a = value.numerator * value.numerator;
-  const b = value.denominator * value.denominator;
-  const _5ad2 = 5n * a * d ** 2n;
-  n = solve(n => b * n ** 2n - _5ad2, n, n - 1n, floor);
-  
-  return Rational.make(n, d);
+  const x0 = value * sqrt5_approx.numerator / sqrt5_approx.denominator;
+  const _5r2 = 5n * value ** 2n;
+  return solve(x => x ** 2n - _5r2, x0, x0 + 1n, floor);
 }
 
-// Im(zeta)^2 ceiling approximation
-const zeta_imag_sq_approx = Rational.make(
-  BigInt(Math.ceil((5 + Math.sqrt(5))/8 * 1e+9)),
+// 4 Im(zeta)^2 ceiling approximation
+const _4_zeta_imag_sq_approx = Rational.make(
+  BigInt(Math.ceil((5 + Math.sqrt(5))/2 * 1e+9)),
   BigInt(1e+9),
 );
 
-// approximate value / Im(zeta)^2
-function div_zeta_imag_sq(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
-  if (value.numerator < 0n) {
-    return Rational.neg(div_zeta_imag_sq(Rational.neg(value), !floor, denominator));
+// approximate value / 4 Im(zeta)^2
+function div_4_zeta_imag_sq(value: bigint, floor: boolean): bigint {
+  if (value < 0n) {
+    return -div_4_zeta_imag_sq(-value, !floor);
   }
-  // Im(zeta)^2 x - r = 0
-  // 5/8 x +- sqrt(5)/8 x - r = 0
-  // (5 x - 8 r)^2 - 5 x^2 = 0
-  // let n/d = x, a/b = r
-  // solve f(n) = (5 b n - 8 a d)^2 - 5 b^2 n^2 = 0
+  // 4 Im(zeta)^2 x - r = 0
+  // 5/2 x +- sqrt(5)/2 x - r = 0
+  // (5 x - 2 r)^2 - 5 x^2 = 0
+  // solve f(x) = (5 x - 2 r)^2 - 5 x^2 = 0
   
-  let n = value.numerator * zeta_imag_sq_approx.denominator;
-  let d = value.denominator * zeta_imag_sq_approx.numerator;
-  while (d < denominator) {
-    n *= 2n;
-    d *= 2n;
-  }
-
-  const a = value.numerator;
-  const b = value.denominator;
-  const _8ad = 8n * a * d;
-  const f = (n: bigint) => {
-    let _5bn = 5n * b * n;
-    return (_5bn - _8ad) ** 2n - _5bn ** 2n / 5n;
-  };
-  n = solve(f, n, n - 1n, floor);
-  
-  return Rational.make(n, d);
+  const x0 = value * _4_zeta_imag_sq_approx.denominator / _4_zeta_imag_sq_approx.numerator;
+  const _2r = 2n * value;
+  return solve(x => (5n * x - _2r) ** 2n - 5n * x ** 2n, x0, x0 + 1n, floor);
 }
 
-// approximate value / Im(zeta)
-function div_zeta_imag(value: Rational.Rational, floor: boolean, denominator: bigint): Rational.Rational {
-  const value_sq = Rational.mul(value, value);
-  const sgn = (value.numerator >= 0) === (value.denominator >= 0) ? 1n : -1n;
+// approximate value / 2 Im(zeta)
+function div_2_zeta_imag(value: bigint, floor: boolean): bigint {
+  const value_sq = value ** 2n;
+  const sgn = value >= 0n ? 1n : -1n;
   if (sgn === -1n) floor = !floor;
-  //                                                 vvvvvvvvvvvvvvvvv--- no, this is wrong...
-  const res = sqrt(div_zeta_imag_sq(value_sq, floor, denominator ** 2n), floor, denominator)!;
-  return sgn === -1n ? Rational.neg(res) : res;
+  return sgn * sqrt(div_4_zeta_imag_sq(value_sq, floor), floor)!;
 }
 
 
 // approximate a bounding box by given boundary in rational numbers.
-export function approxBBox(
-  left: Rational.Rational,
-  bottom: Rational.Rational,
-  right: Rational.Rational,
-  top: Rational.Rational,
-  denominator: bigint = BigInt(1e9),
-): BBox.BBox {
-  const b = div_zeta_imag(bottom, true, denominator);
-  const t = div_zeta_imag(top, false, denominator);
+export function approxBBox(left: bigint, bottom: bigint, right: bigint, top: bigint, unit: Rational.Rational): BBox.BBoxRational {
+  const left_ = left * unit.numerator;
+  const right_ = right * unit.numerator;
+  const bottom_ = div_2_zeta_imag(bottom, true) * unit.numerator;
+  const top_ = div_2_zeta_imag(top, false) * unit.numerator;
   return BBox.make(
-    CF5.make_(
-      left,
-      Rational.mul(b, Rational.make(1n, 2n)),
-      Rational.zero,
-      Rational.zero,
-      Rational.mul(b, Rational.make(-1n, 2n)),
-    ),
-    CF5.make_(
-      right,
-      Rational.mul(t, Rational.make(1n, 2n)),
-      Rational.zero,
-      Rational.zero,
-      Rational.mul(t, Rational.make(-1n, 2n)),
-    ),
+    CF5.make_(left_, bottom_, 0n, 0n, -bottom_),
+    CF5.make_(right_, top_, 0n, 0n, -top_),
+    unit.denominator,
   );
 }
 
-function approxGoldenField(value: GF.GoldenField, floor: boolean, denominator: bigint): Rational.Rational {
-  return Rational.add(value._a, mul_sqrt5(value._b, floor, denominator));
+function approxGoldenFieldRational(value: GF.GoldenFieldRational, floor: boolean): Rational.Rational {
+  return Rational.make(value.numerator._a + mul_sqrt5(value.numerator._b, floor), value.denominator);
 }
 
-export type Complex = {readonly re: number, readonly im: number};
+export type Complex = Readonly<{re: number, im: number}>;
 
 // approximate CF5 as floating numbers in the coordinate of given frame box (1 represents top/right edge).
-export function approxCyclotomicField5(value: CF5.CyclotomicField5, frame: BBox.BBox, denominator: bigint): Complex {
-  const offset = CF5.neg(frame.bl);
-  const extent = CF5.add(frame.tr, offset);
-  const value_ = CF5.add(value, offset);
+export function approxCyclotomicField5(value: CF5.CyclotomicField5, frame: BBox.BBoxRational): Complex {
+  const offset = CF5.neg(frame.numerator.bl);
+  const extent = CF5.add(frame.numerator.tr, offset);
+  const value_num = CF5.add(CF5.mulCoeff(value, frame.denominator), offset);
 
-  const width = CF5.real(extent);
-  const value_x = CF5.real(value_);
-  const re_ = approxGoldenField(GF.mul(value_x, GF.inv(width)), true, denominator);
-  const re = Rational.approxToNumber(re_);
+  const value_num_x = CF5.real(value_num);
+  const width_inv = GF.inv(CF5.real(extent));
+  const value_x = {
+    numerator: GF.mul(value_num_x.numerator, width_inv.numerator),
+    denominator: value_num_x.denominator * width_inv.denominator,
+  };
+  const re = Rational.approxToNumber(approxGoldenFieldRational(value_x, true));
 
-  const height = CF5.real(CF5.mul(extent, CF5.neg_zeta_imag));
-  const value_y = CF5.real(CF5.mul(value_, CF5.neg_zeta_imag));
-  const im_ = approxGoldenField(GF.mul(value_y, GF.inv(height)), true, denominator);
-  const im = Rational.approxToNumber(im_);
+  const value_num_y = CF5.real(CF5.mul(value_num, CF5.neg_2_zeta_imag));
+  const height_inv = GF.inv(CF5.real(CF5.mul(extent, CF5.neg_2_zeta_imag)));
+  const value_y = {
+    numerator: GF.mul(value_num_y.numerator, height_inv.numerator),
+    denominator: value_num_y.denominator * height_inv.denominator,
+  };
+  const im = Rational.approxToNumber(approxGoldenFieldRational(value_y, true));
 
   return Object.freeze({re, im});
 }

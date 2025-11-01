@@ -2,99 +2,88 @@
 /// note that the order of gold field can be easily determined,
 /// which is very useful for BBox.
 
-import * as Rational from "./Rational.js";
+export type GoldenField = Readonly<{_a: bigint, _b: bigint}>;
 
-export type GoldenField = {
-  readonly _a: Rational.Rational,
-  readonly _b: Rational.Rational,
-};
+export type GoldenFieldRational = Readonly<{numerator: GoldenField, denominator: bigint}>;
 
-export function make(
-  _a: Rational.Rational,
-  _b: Rational.Rational,
-): GoldenField {
+export function make(_a: bigint, _b: bigint): GoldenField {
   return Object.freeze({_a, _b});
 }
 
-export const zero = make(Rational.zero, Rational.zero);
+export function makeRational(numerator: GoldenField, denominator: bigint): GoldenFieldRational {
+  return Object.freeze({numerator, denominator});
+}
 
-export const one = make(Rational.one, Rational.zero);
-
-export const sqrt5 = make(Rational.zero, Rational.one);
-
-export const phi = make(Rational.make(1n, 2n), Rational.make(1n, 2n));
+export const zero = make(0n, 0n);
+export const one = make(1n, 0n);
+export const sqrt5 = make(0n, 1n);
 
 export function eq(lhs: GoldenField, rhs: GoldenField): boolean {
-  return Rational.eq(lhs._a, rhs._a)
-    && Rational.eq(lhs._b, rhs._b);
+  return lhs._a === rhs._a && lhs._b === rhs._b;
 }
 
 export function compare(lhs: GoldenField, rhs: GoldenField): -1 | 0 | 1 {
-  const a_sgn = Rational.compare(lhs._a, rhs._a);
-  const b_sgn = Rational.compare(lhs._b, rhs._b);
+  const a_sgn = lhs._a === rhs._a ? 0 : lhs._a > rhs._a ? +1 : -1;
+  const b_sgn = lhs._b === rhs._b ? 0 : lhs._b > rhs._b ? +1 : -1;
   if (a_sgn === 0) return b_sgn;
   if (b_sgn === 0) return a_sgn;
   if (a_sgn === b_sgn) return a_sgn;
 
-  const value = add(lhs, neg(rhs));
-
-  const factor = Rational.gcd(value._a.denominator, value._b.denominator);
-  const a = value._a.numerator * (value._b.denominator / factor);
-  const b = value._b.numerator * (value._a.denominator / factor);
+  const a = lhs._a - rhs._a;
+  const b = lhs._b - rhs._b;
 
   // => a + b sqrt(5)
-  const a2 = a * a;
-  const b2_5 = b * b * 5n;
-  if (a2 > b2_5) {
+  const a2 = a ** 2n;
+  const _5_b2 = 5n * b ** 2n;
+  if (a2 > _5_b2) {
     return a > 0n ? +1 : -1;
   } else {
     return b > 0n ? +1 : -1;
   }
 }
 
+export function compareRational(lhs: GoldenFieldRational, rhs: GoldenFieldRational): -1 | 0 | 1 {
+  return compare(mulCoeff(lhs.numerator, rhs.denominator), mulCoeff(rhs.numerator, lhs.denominator));
+}
+
 export function add(lhs: GoldenField, rhs: GoldenField): GoldenField {
   return make(
-    Rational.add(lhs._a, rhs._a),
-    Rational.add(lhs._b, rhs._b),
+    lhs._a + rhs._a,
+    lhs._b + rhs._b,
   );
 }
 
 export function neg(val: GoldenField): GoldenField {
   return make(
-    Rational.neg(val._a),
-    Rational.neg(val._b),
+    -val._a,
+    -val._b,
   );
 }
 
 export function mul(lhs: GoldenField, rhs: GoldenField): GoldenField {
   return make(
-    Rational.add(
-      Rational.mul(lhs._a, rhs._a),
-      Rational.mul(Rational.mul(lhs._b, rhs._b), Rational.make(5n, 1n)),
-    ),
-    Rational.add(
-      Rational.mul(lhs._a, rhs._b),
-      Rational.mul(lhs._b, rhs._a),
-    ),
+    lhs._a * rhs._a + lhs._b * rhs._b * 5n,
+    lhs._a * rhs._b + lhs._b * rhs._a,
   );
 }
 
-export function mulCoeff(lhs: GoldenField, rhs: Rational.Rational): GoldenField {
+export function mulCoeff(lhs: GoldenField, rhs: bigint): GoldenField {
   return make(
-    Rational.mul(lhs._a, rhs),
-    Rational.mul(lhs._b, rhs),
+    lhs._a * rhs,
+    lhs._b * rhs,
   );
 }
 
-export function inv(value: GoldenField): GoldenField {
-  const n = Rational.inv(Rational.add(
-    Rational.mul(value._a, value._a),
-    Rational.mul(Rational.mul(value._b, value._b), Rational.make(-5n, 1n))
-  ));
-  return make(
-    Rational.mul(value._a, n),
-    Rational.mul(Rational.neg(value._b), n),
+export function inv(value: GoldenFieldRational): GoldenFieldRational {
+  if (eq(value.numerator, zero)) throw new Error(`inverse of 0/1`);
+  const norm_sq = value.numerator._a ** 2n - 5n * value.numerator._b ** 2n;
+  const sgn = norm_sq > 0n ? 1n : -1n;
+  const numerator = make(
+    value.numerator._a * value.denominator * sgn,
+    -value.numerator._b * value.denominator * sgn
   );
+  const denominator = norm_sq * sgn;
+  return makeRational(numerator, denominator);
 }
 
 export function toString(value: GoldenField): string {
