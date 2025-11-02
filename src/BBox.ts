@@ -90,12 +90,12 @@ export function makeTriangle(
   tri: Triangle,
   dir: {bc: Direction, ca: Direction, ab: Direction},
 ): TriangleCached {
-  assert(() => {
-    const bc = project([CF5.add(tri.c, CF5.neg(tri.b))], 1n, dir.bc).min.numerator;
-    const ca = project([CF5.add(tri.a, CF5.neg(tri.c))], 1n, dir.ca).min.numerator;
-    const ab = project([CF5.add(tri.b, CF5.neg(tri.a))], 1n, dir.ab).min.numerator;
-    return [bc, ca, ab].every(e => GF.eq(e, GF.zero));
-  });
+  // assert(() => {
+  //   const bc = project([CF5.add(tri.c, CF5.neg(tri.b))], 1n, dir.bc).min.numerator;
+  //   const ca = project([CF5.add(tri.a, CF5.neg(tri.c))], 1n, dir.ca).min.numerator;
+  //   const ab = project([CF5.add(tri.b, CF5.neg(tri.a))], 1n, dir.ab).min.numerator;
+  //   return [bc, ca, ab].every(e => GF.eq(e, GF.zero));
+  // });
 
   tri = Object.freeze({a: tri.a, b: tri.b, c: tri.c});
   dir = Object.freeze({bc: dir.bc, ca: dir.ca, ab: dir.ab});

@@ -298,9 +298,10 @@ export class PenroseTree {
         continue;
       }
 
+      node.value.state = res === BBox.IntersectionResult.BeContained ? HalfTile.State.Full : HalfTile.State.Partial;
+
       // subdivide if absent
       if (node.children.length === 0) {
-        node.value.state = res === BBox.IntersectionResult.BeContained ? HalfTile.State.Full : HalfTile.State.Partial;
         node.children = node.value.subdivision().map(value => ({value, children: []}));
       }
 
