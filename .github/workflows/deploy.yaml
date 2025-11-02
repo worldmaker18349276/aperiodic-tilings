@@ -25,13 +25,13 @@ jobs:
       - name: Build project
         run: npm ci && npm run build
 
-      - run: cp index.html dist/
-      - run: ls dist
+      - name: Pack output files
+        run: mkdir out/ && cp index.html out/ && mv dist/ out/dist/ && ls out
 
       - name: Upload build output
         uses: actions/upload-pages-artifact@v4
         with:
-          path: dist/
+          path: out/
 
   deploy:
     name: Deploy
