@@ -15,7 +15,8 @@
       const y_coordinate = document.getElementById("y-coordinate");
       canvas.setAttribute("width", `${window.innerWidth - 15}`);
       canvas.setAttribute("height", `${window.innerHeight - 15}`);
-      window.state = new State(canvas, x_coordinate, y_coordinate);
+      const draw_level = window.location.hash === "#P2" ? 1 : 0;
+      window.state = new State(canvas, x_coordinate, y_coordinate, draw_level);
       
     </script>
   </body>

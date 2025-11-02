@@ -4,8 +4,6 @@ import * as RationalParser from "./RationalParser.js";
 import * as BBox from "./BBox.js";
 import * as Approx from "./Approx.js";
 
-type Triangle = {a: Approx.Complex, b: Approx.Complex, c: Approx.Complex};
-
 export class State {
   #draw_level: number = 0;
   #margin: number;
@@ -101,7 +99,8 @@ export class State {
     return Approx.approxBBox(l, b, r, t, this.#unit);
   }
   
-  constructor(canvas: HTMLCanvasElement, x_coordinate: HTMLInputElement, y_coordinate: HTMLInputElement, margin=0.0) {
+  constructor(canvas: HTMLCanvasElement, x_coordinate: HTMLInputElement, y_coordinate: HTMLInputElement, draw_level=0, margin=0.0) {
+    this.#draw_level = draw_level;
     this.#margin = margin;
     this.#canvas = canvas;
     this.#x_coordinate = x_coordinate;
@@ -194,44 +193,58 @@ export class State {
     this.#y_coordinate.value = RationalParser.formatRational(pos[1]);
   }
 
-  static #approxTriangles(triangles: BBox.TriangleCached[], bound: BBox.BBoxRational): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
-    return triangles
-      .map(tri => tri.tri)
-      .map(({a, b, c}) => {
-        return {
-          a: Approx.approxCyclotomicField5(a, bound),
-          b: Approx.approxCyclotomicField5(b, bound),
-          c: Approx.approxCyclotomicField5(c, bound),
-        };
-      });
+  #stroke_style = "#06c";
+  #fill_styles: Record<Penrose.HalfTile.Type, string> = {
+    [Penrose.HalfTile.Type.P2XL]: "#9cf",
+    [Penrose.HalfTile.Type.P2XR]: "#8be",
+    [Penrose.HalfTile.Type.P2YL]: "#baf",
+    [Penrose.HalfTile.Type.P2YR]: "#a9e",
+    [Penrose.HalfTile.Type.P3XL]: "#9cf",
+    [Penrose.HalfTile.Type.P3XR]: "#8be",
+    [Penrose.HalfTile.Type.P3YL]: "#baf",
+    [Penrose.HalfTile.Type.P3YR]: "#a9e",
   }
   
   #draw(bound: BBox.BBoxRational) {
-    const triangles = State.#approxTriangles(this.#tree.getTriangles(this.#draw_level), bound);
+    const tiles = this.#tree.getHalfTiles(this.#draw_level);
     this.#ctx.clearRect(0, 0, this.#canvas.clientWidth, this.#canvas.clientHeight);
-    for (const {a, b, c} of triangles) {
+    for (const tile of tiles) {
+      const a = Approx.approxCyclotomicField5(tile.tri.tri.a, bound);
+      const b = Approx.approxCyclotomicField5(tile.tri.tri.b, bound);
+      const c = Approx.approxCyclotomicField5(tile.tri.tri.c, bound);
+
       // fill triangles
       this.#ctx.beginPath();
       this.#ctx.moveTo(...this.#toPixel(a.re, a.im));
       this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
       this.#ctx.lineTo(...this.#toPixel(c.re, c.im));
       this.#ctx.closePath();
-      this.#ctx.fillStyle = "#9cf";
+      this.#ctx.fillStyle = this.#fill_styles[tile.type]!;
       this.#ctx.fill();
 
       // draw tile borders
       this.#ctx.beginPath();
-      this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
-      this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
-      this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
-      this.#ctx.strokeStyle = "#06c";
+      if (Penrose.HalfTile.parity(tile.type) === Penrose.HalfTile.Parity.P3) {
+        this.#ctx.moveTo(...this.#toPixel(c.re, c.im));
+        this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
+        this.#ctx.lineTo(...this.#toPixel(b.re, b.im));
+      } else {
+        this.#ctx.moveTo(...this.#toPixel(b.re, b.im));
+        this.#ctx.lineTo(...this.#toPixel(c.re, c.im));
+        this.#ctx.lineTo(...this.#toPixel(a.re, a.im));
+      }
+      this.#ctx.strokeStyle = this.#stroke_style;
       this.#ctx.stroke();
     }
 
     if (this.#margin !== 0.0) {
       // draw previous level
-      const triangles_parent = State.#approxTriangles(this.#tree.getTriangles(this.#draw_level + 1), bound);
-      for (const {a, b, c} of triangles_parent) {
+      const tiles_parent = this.#tree.getHalfTiles(this.#draw_level + 1);
+      for (const tile of tiles_parent) {
+        const a = Approx.approxCyclotomicField5(tile.tri.tri.a, bound);
+        const b = Approx.approxCyclotomicField5(tile.tri.tri.b, bound);
+        const c = Approx.approxCyclotomicField5(tile.tri.tri.c, bound);
+
         // draw parent tile borders as dashed lines
         this.#ctx.beginPath();
         this.#ctx.setLineDash([5, 10]);

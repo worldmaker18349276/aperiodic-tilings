@@ -18,22 +18,22 @@ export class HalfTile {
   }
 
   static make(type: HalfTile.Type, bc: BBox.Direction, tri: BBox.Triangle): HalfTile {
-    const sign = (HalfTile.#orientation(type) === HalfTile.Orientation.L ? +1 : -1);
-    const n = HalfTile.#shape(type) === HalfTile.Shape.X ? 2 : -1;
+    const sign = (HalfTile.orientation(type) === HalfTile.Orientation.L ? +1 : -1);
+    const n = HalfTile.shape(type) === HalfTile.Shape.X ? 2 : -1;
     let ca = BBox.rotate(bc, n * sign);
     let ab = BBox.rotate(bc, -n * sign);
     return new HalfTile(type, BBox.makeTriangle(tri, {bc, ca, ab}));
   }
 
-  static #parity(type: HalfTile.Type): HalfTile.Parity {
+  static parity(type: HalfTile.Type): HalfTile.Parity {
     return type & (1 << 0);
   }
 
-  static #shape(type: HalfTile.Type): HalfTile.Shape {
+  static shape(type: HalfTile.Type): HalfTile.Shape {
     return type & (1 << 1);
   }
 
-  static #orientation(type: HalfTile.Type): HalfTile.Orientation {
+  static orientation(type: HalfTile.Type): HalfTile.Orientation {
     return type & (1 << 2);
   }
 
@@ -68,9 +68,9 @@ export class HalfTile {
   }
 
   public subdivision(): HalfTile[] {
-    const p = HalfTile.#parity(this.type);
-    const s = HalfTile.#shape(this.type);
-    const o = HalfTile.#orientation(this.type);
+    const p = HalfTile.parity(this.type);
+    const s = HalfTile.shape(this.type);
+    const o = HalfTile.orientation(this.type);
     const o_sign = o === HalfTile.Orientation.L ? +1 : -1;
     if (p === HalfTile.Parity.P3 && s === HalfTile.Shape.X) {
       const d = HalfTile.#calculateTri(o, this.tri.tri.a, this.tri.tri.b);
@@ -358,7 +358,7 @@ export class PenroseTree {
     this.#refine(bound_cached);
   }
   
-  public getTriangles(level = 0): BBox.TriangleCached[] {
+  public getHalfTiles(level = 0): HalfTile[] {
     // get leaves
     let nodes = [this.root];
     for (let l = this.level * 8; l > level; l--) {
@@ -366,6 +366,6 @@ export class PenroseTree {
     }
     return nodes
       .filter(node => node.value.state !== HalfTile.State.Empty)
-      .map(node => node.value.tri);
+      .map(node => node.value);
   }
 }
