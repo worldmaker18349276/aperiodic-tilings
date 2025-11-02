@@ -25,6 +25,9 @@ jobs:
       - name: Build project
         run: npm ci && npm run build
 
+      - name: Copy HTML
+        run: cp index.html dist/
+
       - name: Upload build output
         uses: actions/upload-pages-artifact@v4
         with:
