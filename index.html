@@ -3,13 +3,19 @@
   <head><meta charset="UTF-8"/></head>
   <body style="overflow: hidden;">
     <canvas id="canvas"></canvas>
+    <div style="display:block; position: fixed; bottom: 5px; left: 5px; z-index: 100;">
+      <input id="x-coordinate" type="text"/><br/>
+      <input id="y-coordinate" type="text"/>
+    </div>
     <script type="module">
       import { State } from "./dist/index.js";
       
       const canvas = document.getElementById("canvas");
+      const x_coordinate = document.getElementById("x-coordinate");
+      const y_coordinate = document.getElementById("y-coordinate");
       canvas.setAttribute("width", `${window.innerWidth - 15}`);
       canvas.setAttribute("height", `${window.innerHeight - 15}`);
-      window.state = new State(canvas);
+      window.state = new State(canvas, x_coordinate, y_coordinate);
       
     </script>
   </body>

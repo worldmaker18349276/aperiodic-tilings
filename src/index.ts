@@ -1,5 +1,6 @@
 import * as Penrose from "./Penrose.js";
 import * as Rational from "./Rational.js";
+import * as RationalParser from "./RationalParser.js";
 import * as BBox from "./BBox.js";
 import * as Approx from "./Approx.js";
 
@@ -26,6 +27,8 @@ export class State {
     rate: Rational.make(19n, 20n),
   };
   #canvas: HTMLCanvasElement;
+  #x_coordinate: HTMLInputElement;
+  #y_coordinate: HTMLInputElement;
   #ctx: CanvasRenderingContext2D;
 
   #tree: Penrose.PenroseTree;
@@ -57,6 +60,25 @@ export class State {
     return [this.#approx(this.#center[0]), this.#approx(this.#center[1])];
   }
   
+  getPosition(x_pixel: bigint, y_pixel: bigint): [Rational.Rational, Rational.Rational] {
+    const width = this.getWidth();
+    const height = this.getHeight();
+    const view_width = this.#view_width;
+    const view_height = Rational.mul(this.#view_width, Rational.make(height, width));
+    const x = Rational.add(
+      this.#center[0],
+      Rational.mul(Rational.add(Rational.make(x_pixel, width), Rational.make(-1n, 2n)), view_width),
+    );
+    const y = Rational.add(
+      this.#center[1],
+      Rational.mul(Rational.add(Rational.make(y_pixel, height), Rational.make(-1n, 2n)), view_height),
+    );
+    return [
+      this.#approx(x),
+      this.#approx(y),
+    ];
+  }
+  
   getBound(): BBox.BBoxRational {
     const half_view_width = Rational.mul(this.#view_width, Rational.make(1n, 2n));
     const half_view_height = Rational.mul(
@@ -79,9 +101,11 @@ export class State {
     return Approx.approxBBox(l, b, r, t, this.#unit);
   }
   
-  constructor(canvas: HTMLCanvasElement, margin=0.0) {
+  constructor(canvas: HTMLCanvasElement, x_coordinate: HTMLInputElement, y_coordinate: HTMLInputElement, margin=0.0) {
     this.#margin = margin;
     this.#canvas = canvas;
+    this.#x_coordinate = x_coordinate;
+    this.#y_coordinate = y_coordinate;
     this.#ctx = canvas.getContext("2d")!;
 
     this.#updateUnit();
@@ -105,9 +129,10 @@ export class State {
         this.#drag_state.lastY = e.offsetY;
         const dx = BigInt(lastX - e.offsetX);
         const dy = BigInt(lastY - e.offsetY);
-        console.log(`move ${dx}, ${dy}`);
+        // console.log(`move ${dx}, ${dy}`);
         this.move(dx, dy);
       }
+      this.updateCoord(e.clientX, e.clientY);
     };
     this.#canvas.onwheel = e => {
       e.preventDefault();
@@ -120,8 +145,17 @@ export class State {
       const n_ = BigInt(n > 0n ? n : -n);
       let zoom = Rational.make(this.#zoom_state.rate.numerator ** n_, this.#zoom_state.rate.denominator ** n_);
       if (e.deltaY > 0) zoom = Rational.inv(zoom);
-      console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);
+      // console.log(`zoom ${zoom.numerator}/${zoom.denominator}`);
       this.zoom(zoom);
+      this.updateCoord(e.clientX, e.clientY);
+    };
+    this.#x_coordinate.onchange = e => {
+      const x = RationalParser.parseRationalExpr(this.#x_coordinate.value);
+      this.moveTo(x, this.#center[1]);
+    };
+    this.#y_coordinate.onchange = e => {
+      const y = RationalParser.parseRationalExpr(this.#y_coordinate.value);
+      this.moveTo(this.#center[0], y);
     };
   }
   
@@ -137,6 +171,11 @@ export class State {
     this.update();
   }
 
+  moveTo(x: Rational.Rational, y: Rational.Rational) {
+    this.#center = [x, y];
+    this.update();
+  }
+  
   zoom(zoom: Rational.Rational) {
     this.#view_width = Rational.mul(this.#view_width, Rational.inv(zoom));
     this.#updateUnit();
@@ -147,6 +186,12 @@ export class State {
     const bound = this.getBound();
     this.#tree.update(bound);
     this.#draw(bound);
+  }
+
+  updateCoord(x_pixel: number, y_pixel: number) {
+    const pos = this.getPosition(BigInt(Math.floor(x_pixel)), BigInt(Math.floor(y_pixel)));
+    this.#x_coordinate.value = RationalParser.formatRational(pos[0]);
+    this.#y_coordinate.value = RationalParser.formatRational(pos[1]);
   }
 
   static #approxTriangles(triangles: BBox.TriangleCached[], bound: BBox.BBoxRational): {a:Approx.Complex, b:Approx.Complex, c:Approx.Complex}[] {
