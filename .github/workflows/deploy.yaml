@@ -25,7 +25,7 @@ jobs:
       - name: Build project
         run: npm ci && npm run build
 
-      - run: ls
+      - run: ls dist
 
       - name: Upload build output
         uses: actions/upload-pages-artifact@v4
