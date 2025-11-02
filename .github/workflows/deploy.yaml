@@ -25,6 +25,7 @@ jobs:
       - name: Build project
         run: npm ci && npm run build
 
+      - run: cp index.html dist/
       - run: ls dist
 
       - name: Upload build output
